@@ -82,8 +82,11 @@ export interface Court {
 // ── Parejas ───────────────────────────────────────────────────────────────────
 
 export interface PairPlayer {
-  playerId: number
-  playerName: string
+  id: number
+  firstName: string
+  lastName: string
+  phone: string
+  points: number
 }
 
 export interface Pair {

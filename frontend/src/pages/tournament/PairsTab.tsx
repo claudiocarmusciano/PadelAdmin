@@ -70,7 +70,7 @@ export default function PairsTab({ tournamentId }: Props) {
   }
 
   // Players already in a pair in this tournament
-  const usedPlayerIds = new Set(pairs.flatMap((p) => p.players.map((pl) => pl.playerId)))
+  const usedPlayerIds = new Set(pairs.flatMap((p) => p.players.map((pl) => pl.id)))
 
   const availablePlayers = players.filter(
     (pl) =>
@@ -113,7 +113,7 @@ export default function PairsTab({ tournamentId }: Props) {
               <CardContent className="flex items-center gap-3 py-3">
                 <Badge variant="outline" className="shrink-0 text-xs">#{idx + 1}</Badge>
                 <div className="flex-1 text-sm font-medium">
-                  {pair.players.map((p) => p.playerName).join(' / ')}
+                  {pair.players.map((p) => `${p.firstName} ${p.lastName}`).join(' / ')}
                 </div>
                 <span className="text-xs text-muted-foreground">{pair.totalPoints} pts</span>
                 <Button
