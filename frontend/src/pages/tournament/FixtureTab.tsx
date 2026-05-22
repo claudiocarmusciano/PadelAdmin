@@ -190,7 +190,7 @@ function MatchCard({
               <div className="flex items-center gap-1.5 mt-1 text-xs text-muted-foreground">
                 <Clock size={11} />
                 <span>
-                  {format(new Date(match.scheduledStart), 'EEEE d MMM HH:mm', { locale: es })}
+                  {(() => { try { return format(new Date(match.scheduledStart as string), 'EEEE d MMM HH:mm', { locale: es }) } catch { return String(match.scheduledStart) } })()}
                 </span>
                 {match.courtName && <span>· {match.courtName}</span>}
               </div>

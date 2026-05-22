@@ -51,9 +51,7 @@ function BracketMatch({ match }: { match: EliminationMatch }) {
       </div>
       {match.scheduledStart && (
         <p className="text-xs text-muted-foreground mt-1.5">
-          {new Date(match.scheduledStart).toLocaleString('es-AR', {
-            weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit',
-          })}
+          {(() => { try { return new Date(match.scheduledStart as string).toLocaleString('es-AR', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) } catch { return '' } })()}
           {match.courtName && ` · ${match.courtName}`}
         </p>
       )}

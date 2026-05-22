@@ -60,7 +60,7 @@ export default function TournamentDetailPage() {
         {tabs.map(({ path, label }) => (
           <NavLink
             key={path}
-            to={path}
+            to={`/tournaments/${tournamentId}/${path}`}
             className={({ isActive }) =>
               cn(
                 'px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors',
@@ -77,7 +77,7 @@ export default function TournamentDetailPage() {
 
       {/* Tab content */}
       <Routes>
-        <Route index element={<Navigate to="pairs" replace />} />
+        <Route index element={<Navigate to={`/tournaments/${tournamentId}/pairs`} replace />} />
         <Route path="pairs" element={<PairsTab tournamentId={tournamentId} />} />
         <Route path="zones" element={<ZonesTab tournamentId={tournamentId} />} />
         <Route path="fixture" element={<FixtureTab tournamentId={tournamentId} />} />
