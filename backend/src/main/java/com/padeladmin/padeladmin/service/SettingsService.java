@@ -11,6 +11,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -26,13 +27,13 @@ public class SettingsService {
     // ── Point configs ─────────────────────────────────────────────────────────
 
     public List<PointConfigDto> getPointConfigs() {
-        Map<TournamentStage, Integer> existing = pointConfigRepository.findAll()
+        Map<TournamentStage, BigDecimal> existing = pointConfigRepository.findAll()
                 .stream()
                 .collect(Collectors.toMap(PointConfig::getStage, PointConfig::getPoints));
 
         // Devuelve todos los stages en orden definido por el enum, con 0 si aún no se configuró
         return Arrays.stream(TournamentStage.values())
-                .map(stage -> new PointConfigDto(stage, existing.getOrDefault(stage, 0)))
+                .map(stage -> new PointConfigDto(stage, existing.getOrDefault(stage, BigDecimal.ZERO)))
                 .collect(Collectors.toList());
     }
 

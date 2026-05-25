@@ -38,7 +38,7 @@ function PointsCard() {
   })
 
   const setPoints = (stage: string, value: string) => {
-    const n = parseInt(value, 10)
+    const n = parseFloat(value)
     setDraft((prev) =>
       prev.map((c) => (c.stage === stage ? { ...c, points: isNaN(n) ? 0 : Math.max(0, n) } : c))
     )
@@ -64,17 +64,18 @@ function PointsCard() {
           <div className="space-y-2">
             {draft.map((cfg) => (
               <div key={cfg.stage} className="flex items-center gap-3">
-                <Label className="w-44 shrink-0 text-sm text-muted-foreground">
+                <Label className="flex-1 md:flex-none md:w-44 md:shrink-0 text-sm text-muted-foreground">
                   {STAGE_LABELS[cfg.stage]}
                 </Label>
                 <Input
                   type="number"
                   min={0}
+                  step={0.5}
                   value={cfg.points}
                   onChange={(e) => setPoints(cfg.stage, e.target.value)}
-                  className="w-24 h-8 text-sm"
+                  className="w-20 md:w-24 h-8 text-sm shrink-0"
                 />
-                <span className="text-xs text-muted-foreground">pts</span>
+                <span className="text-xs text-muted-foreground shrink-0">pts</span>
               </div>
             ))}
 
@@ -145,32 +146,36 @@ function GeneralCard() {
           <p className="text-sm text-muted-foreground">Cargando...</p>
         ) : (
           <div className="space-y-4">
-            <div className="flex items-center gap-3">
-              <Label className="w-60 shrink-0 text-sm text-muted-foreground">
+            <div className="flex flex-col md:flex-row md:items-center gap-2 md:gap-3">
+              <Label className="md:w-60 md:shrink-0 text-sm text-muted-foreground">
                 Duración por defecto de partidos
               </Label>
-              <Input
-                type="number"
-                min={1}
-                value={draft.defaultMatchDurationMinutes}
-                onChange={(e) => setField('defaultMatchDurationMinutes', e.target.value)}
-                className="w-24 h-8 text-sm"
-              />
-              <span className="text-xs text-muted-foreground">min</span>
+              <div className="flex items-center gap-2">
+                <Input
+                  type="number"
+                  min={1}
+                  value={draft.defaultMatchDurationMinutes}
+                  onChange={(e) => setField('defaultMatchDurationMinutes', e.target.value)}
+                  className="w-24 h-8 text-sm"
+                />
+                <span className="text-xs text-muted-foreground">min</span>
+              </div>
             </div>
 
-            <div className="flex items-center gap-3">
-              <Label className="w-60 shrink-0 text-sm text-muted-foreground">
+            <div className="flex flex-col md:flex-row md:items-center gap-2 md:gap-3">
+              <Label className="md:w-60 md:shrink-0 text-sm text-muted-foreground">
                 Pausa mínima entre partidos de la misma pareja (zona)
               </Label>
-              <Input
-                type="number"
-                min={0}
-                value={draft.defaultMinIntervalMinutes}
-                onChange={(e) => setField('defaultMinIntervalMinutes', e.target.value)}
-                className="w-24 h-8 text-sm"
-              />
-              <span className="text-xs text-muted-foreground">min</span>
+              <div className="flex items-center gap-2">
+                <Input
+                  type="number"
+                  min={0}
+                  value={draft.defaultMinIntervalMinutes}
+                  onChange={(e) => setField('defaultMinIntervalMinutes', e.target.value)}
+                  className="w-24 h-8 text-sm"
+                />
+                <span className="text-xs text-muted-foreground">min</span>
+              </div>
             </div>
 
             <div className="pt-1 flex justify-end">
