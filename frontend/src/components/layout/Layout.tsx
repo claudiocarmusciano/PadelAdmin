@@ -1,5 +1,5 @@
 import { Outlet, NavLink } from 'react-router-dom'
-import { Trophy, Users, Tag, Building2 } from 'lucide-react'
+import { Trophy, Users, Tag, Building2, Settings } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import PadelAdminLogo from '@/components/logo/PadelAdminLogo'
 
@@ -9,6 +9,25 @@ const navItems = [
   { to: '/categories', label: 'Categorías', icon: Tag },
   { to: '/complexes', label: 'Complejos', icon: Building2 },
 ]
+
+function NavItem({ to, label, icon: Icon }: { to: string; label: string; icon: React.ElementType }) {
+  return (
+    <NavLink
+      to={to}
+      className={({ isActive }) =>
+        cn(
+          'flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors',
+          isActive
+            ? 'bg-primary text-primary-foreground'
+            : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
+        )
+      }
+    >
+      <Icon size={16} />
+      {label}
+    </NavLink>
+  )
+}
 
 export default function Layout() {
   return (
@@ -23,25 +42,18 @@ export default function Layout() {
           </div>
         </div>
         <nav className="flex-1 p-3 space-y-1">
-          {navItems.map(({ to, label, icon: Icon }) => (
-            <NavLink
-              key={to}
-              to={to}
-              className={({ isActive }) =>
-                cn(
-                  'flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors',
-                  isActive
-                    ? 'bg-primary text-primary-foreground'
-                    : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
-                )
-              }
-            >
-              <Icon size={16} />
-              {label}
-            </NavLink>
+          {navItems.map(({ to, label, icon }) => (
+            <NavItem key={to} to={to} label={label} icon={icon} />
           ))}
         </nav>
-        <div className="p-4 border-t text-xs text-muted-foreground">v1.0.0</div>
+        {/* Admin section */}
+        <div className="p-3 border-t space-y-1">
+          <p className="px-3 pb-1 text-[10px] uppercase tracking-widest text-muted-foreground/60 font-semibold">
+            Admin
+          </p>
+          <NavItem to="/settings" label="Configuración" icon={Settings} />
+        </div>
+        <div className="px-4 py-3 border-t text-xs text-muted-foreground">v1.0.0</div>
       </aside>
 
       {/* Main content */}

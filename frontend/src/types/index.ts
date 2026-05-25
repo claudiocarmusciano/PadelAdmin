@@ -272,3 +272,38 @@ export interface EliminationBracket {
   bracketSize: number
   rounds: Record<string, EliminationMatch[]>
 }
+
+// ── Configuración ─────────────────────────────────────────────────────────────
+
+export type TournamentStage =
+  | 'PARTICIPANT'
+  | 'ZONE_PASS'
+  | 'ROUND_32'
+  | 'ROUND_16'
+  | 'ROUND_8'
+  | 'QUARTERFINAL'
+  | 'SEMIFINAL'
+  | 'FINALIST'
+  | 'CHAMPION'
+
+export const STAGE_LABELS: Record<TournamentStage, string> = {
+  PARTICIPANT:   'Participante',
+  ZONE_PASS:     'Pasa zona',
+  ROUND_32:      '32avos de final',
+  ROUND_16:      '16avos de final',
+  ROUND_8:       'Octavos de final',
+  QUARTERFINAL:  'Cuartos de final',
+  SEMIFINAL:     'Semifinal',
+  FINALIST:      'Finalista',
+  CHAMPION:      'Campeón',
+}
+
+export interface PointConfig {
+  stage: TournamentStage
+  points: number
+}
+
+export interface GlobalSettings {
+  defaultMatchDurationMinutes: number
+  defaultMinIntervalMinutes: number
+}
