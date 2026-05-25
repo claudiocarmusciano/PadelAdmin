@@ -62,15 +62,15 @@ export default function TournamentDetailPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-start justify-between">
-        <div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-bold">{tournament.name}</h1>
-            <Badge variant={statusColors[tournament.status] as any}>
+      <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4 md:gap-0">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <h1 className="text-xl md:text-2xl font-bold">{tournament.name}</h1>
+            <Badge variant={statusColors[tournament.status] as any} className="text-xs">
               {statusLabels[tournament.status]}
             </Badge>
           </div>
-          <p className="text-sm text-muted-foreground mt-1">
+          <p className="text-xs md:text-sm text-muted-foreground mt-1 line-clamp-2">
             {tournament.categoryName} · {tournament.complexName} · {tournament.startDate} → {tournament.endDate}
           </p>
         </div>
@@ -78,18 +78,18 @@ export default function TournamentDetailPage() {
           <Button
             variant="outline"
             size="sm"
-            className="border-muted-foreground/30 text-muted-foreground hover:border-destructive hover:text-destructive"
+            className="border-muted-foreground/30 text-muted-foreground hover:border-destructive hover:text-destructive w-full md:w-auto shrink-0"
             onClick={handleFinalize}
             disabled={finalizeMut.isPending}
           >
-            <CheckCircle size={14} className="mr-1.5" />
-            Marcar como finalizado
+            <CheckCircle size={14} className="mr-1.5 shrink-0" />
+            <span className="truncate">Marcar como finalizado</span>
           </Button>
         )}
       </div>
 
       {/* Tabs */}
-      <div className="border-b flex gap-1">
+      <div className="border-b flex gap-1 overflow-x-auto -mx-4 md:mx-0 px-4 md:px-0">
         {tabs.map(({ path, label }) => (
           <NavLink
             key={path}

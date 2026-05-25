@@ -28,16 +28,16 @@ function StandingsTable({ zoneId }: { zoneId: number }) {
   const zoneComplete = standings.every((s) => s.played >= 2)
 
   return (
-    <div className="px-4 pb-4">
-      <Table>
+    <div className="px-4 pb-4 overflow-x-auto">
+      <Table className="text-xs md:text-sm">
         <TableHeader>
           <TableRow>
-            <TableHead className="text-orange-300 w-8">#</TableHead>
+            <TableHead className="text-orange-300 w-8 hidden md:table-cell">#</TableHead>
             <TableHead className="text-orange-300">Pareja</TableHead>
-            <TableHead className="text-orange-300 text-center">PJ</TableHead>
-            <TableHead className="text-orange-300 text-center">G</TableHead>
-            <TableHead className="text-orange-300 text-center">P</TableHead>
-            <TableHead className="text-orange-300 text-center">Sets +/-</TableHead>
+            <TableHead className="text-orange-300 text-center hidden md:table-cell">PJ</TableHead>
+            <TableHead className="text-orange-300 text-center hidden lg:table-cell">G</TableHead>
+            <TableHead className="text-orange-300 text-center hidden lg:table-cell">P</TableHead>
+            <TableHead className="text-orange-300 text-center hidden lg:table-cell">Sets +/-</TableHead>
             <TableHead className="text-orange-300 text-center">Pts.</TableHead>
             <TableHead className="text-orange-300 text-center">Clasif.</TableHead>
           </TableRow>
@@ -45,14 +45,14 @@ function StandingsTable({ zoneId }: { zoneId: number }) {
         <TableBody>
           {standings.map((s) => (
             <TableRow key={s.pairId}>
-              <TableCell className="font-medium">{s.position}</TableCell>
-              <TableCell className="text-sm">
+              <TableCell className="font-medium hidden md:table-cell">{s.position}</TableCell>
+              <TableCell className="text-xs md:text-sm truncate">
                 {s.player1} / {s.player2}
               </TableCell>
-              <TableCell className="text-center">{s.played}</TableCell>
-              <TableCell className="text-center">{s.wins}</TableCell>
-              <TableCell className="text-center">{s.losses}</TableCell>
-              <TableCell className="text-center">
+              <TableCell className="text-center hidden md:table-cell">{s.played}</TableCell>
+              <TableCell className="text-center hidden lg:table-cell">{s.wins}</TableCell>
+              <TableCell className="text-center hidden lg:table-cell">{s.losses}</TableCell>
+              <TableCell className="text-center hidden lg:table-cell">
                 {s.setsFor}-{s.setsAgainst}
               </TableCell>
               <TableCell className="text-center font-semibold">

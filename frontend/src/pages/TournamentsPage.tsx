@@ -184,13 +184,13 @@ export default function TournamentsPage() {
             const ns = nextStatus(t)
             return (
               <Card key={t.id} className="hover:shadow-md transition-shadow">
-                <CardContent className="flex items-center gap-4 py-4">
+                <CardContent className="flex flex-col md:flex-row md:items-center gap-4 py-3 md:py-4">
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="font-semibold truncate">{t.name}</span>
-                      <Badge variant={statusColors[t.status] as any}>{statusLabels[t.status]}</Badge>
+                    <div className="flex items-center gap-2 mb-1 flex-wrap">
+                      <span className="font-semibold truncate text-sm md:text-base">{t.name}</span>
+                      <Badge variant={statusColors[t.status] as any} className="text-xs">{statusLabels[t.status]}</Badge>
                     </div>
-                    <div className="text-xs text-muted-foreground flex flex-wrap gap-x-4 gap-y-0.5">
+                    <div className="text-xs text-muted-foreground flex flex-col gap-1 md:flex-row md:flex-wrap md:gap-x-4 md:gap-y-0.5">
                       <span>{t.categoryName}</span>
                       <span>{t.complexName}</span>
                       <span>
@@ -200,14 +200,14 @@ export default function TournamentsPage() {
                       <span>{t.matchDurationMinutes} min / intervalo {t.minIntervalMinutes} min</span>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    <Button size="sm" variant="ghost" onClick={() => navigate(`/tournaments/${t.id}/pairs`)}>
+                  <div className="flex gap-2 shrink-0 flex-wrap md:flex-nowrap">
+                    <Button size="sm" variant="ghost" onClick={() => navigate(`/tournaments/${t.id}/pairs`)} className="flex-1 md:flex-none">
                       <ChevronRight size={16} />
                     </Button>
-                    <Button size="sm" variant="ghost" onClick={() => handleOpen(t)}>
+                    <Button size="sm" variant="ghost" onClick={() => handleOpen(t)} className="flex-1 md:flex-none">
                       <Pencil size={16} />
                     </Button>
-                    <Button size="sm" variant="ghost" onClick={() => handleDelete(t)}>
+                    <Button size="sm" variant="ghost" onClick={() => handleDelete(t)} className="flex-1 md:flex-none">
                       <Trash2 size={16} className="text-destructive" />
                     </Button>
                   </div>

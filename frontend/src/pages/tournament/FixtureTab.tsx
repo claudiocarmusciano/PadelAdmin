@@ -454,23 +454,25 @@ function MatchCard({
             )}
           </div>
 
-          <div className="flex flex-col gap-1.5 shrink-0">
+          <div className="flex flex-col md:flex-col gap-1.5 shrink-0">
             {(match.status === 'SCHEDULED' || match.status === 'CONFIRMED' || match.status === 'PENDING') && match.pair1 && match.pair2 && (
-              <Button size="sm" variant="outline" onClick={() => onResult(match)}>
+              <Button size="sm" variant="outline" onClick={() => onResult(match)} className="text-xs md:text-sm">
                 <Play size={13} className="mr-1" />
-                Resultado
+                <span className="hidden md:inline">Resultado</span>
+                <span className="md:hidden">Res.</span>
               </Button>
             )}
             {match.status === 'PLAYED' && (
               <Button size="sm" variant="ghost" className="text-xs text-muted-foreground" onClick={() => onResult(match)}>
                 <Pencil size={12} className="mr-1" />
-                Editar
+                Ed.
               </Button>
             )}
             {match.status !== 'PLAYED' && match.status !== 'CANCELLED' && (
               <Button size="sm" variant="ghost" className="text-xs text-muted-foreground" onClick={() => onCourt(match)}>
                 <Pencil size={12} className="mr-1" />
-                {match.courtName ? 'Cambiar cancha' : 'Asignar cancha'}
+                <span className="hidden md:inline">{match.courtName ? 'Cambiar cancha' : 'Asignar cancha'}</span>
+                <span className="md:hidden">Cancha</span>
               </Button>
             )}
           </div>
