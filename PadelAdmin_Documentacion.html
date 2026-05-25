@@ -1,0 +1,1194 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PadelAdmin — Documentación</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg:        #121212;
+      --card:      #1E1E1E;
+      --card2:     #252525;
+      --border:    #2A2A2A;
+      --muted:     #2A2A2A;
+      --fg:        #FFFFFF;
+      --fg-muted:  #A0A0A0;
+      --primary:   #FF7835;
+      --primary-d: #cc5e25;
+      --primary-a: rgba(255,120,53,.12);
+      --primary-b: rgba(255,120,53,.20);
+      --destructive: #EF4444;
+      --green:     #34D399;
+      --green-a:   rgba(52,211,153,.12);
+      --blue:      #60A5FA;
+      --blue-a:    rgba(96,165,250,.12);
+      --yellow:    #FBBF24;
+      --yellow-a:  rgba(251,191,36,.12);
+      --purple:    #A78BFA;
+      --sidebar-w: 252px;
+      --radius:    10px;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body {
+      font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--fg);
+      line-height: 1.65;
+      font-size: 14.5px;
+    }
+
+    /* ── Scrollbar ── */
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: var(--bg); }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: #3A3A3A; }
+
+    /* ══ LAYOUT ══ */
+    .layout { display: flex; min-height: 100vh; }
+
+    /* ── Sidebar ── */
+    .sidebar {
+      width: var(--sidebar-w);
+      background: var(--card);
+      border-right: 1px solid var(--border);
+      position: fixed; top: 0; left: 0;
+      height: 100vh; overflow-y: auto;
+      z-index: 100; display: flex; flex-direction: column;
+    }
+    .sidebar-header {
+      padding: 20px 18px 16px;
+      border-bottom: 1px solid var(--border);
+    }
+    .sidebar-logo {
+      display: flex; align-items: center; gap: 10px;
+      font-size: 16px; font-weight: 700; color: var(--fg);
+    }
+    .logo-ball {
+      width: 34px; height: 34px;
+      background: var(--primary);
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 17px; flex-shrink: 0;
+    }
+    .logo-sub { font-size: 11px; color: var(--fg-muted); margin-top: 2px; }
+    .sidebar nav { padding: 10px 0; flex: 1; }
+    .nav-section {
+      padding: 10px 18px 4px;
+      font-size: 10px; font-weight: 700;
+      text-transform: uppercase; letter-spacing: .1em;
+      color: var(--fg-muted);
+    }
+    .nav-link {
+      display: flex; align-items: center; gap: 9px;
+      padding: 8px 18px;
+      font-size: 13px; font-weight: 500;
+      color: var(--fg-muted);
+      text-decoration: none;
+      border-radius: 0;
+      transition: background .15s, color .15s;
+    }
+    .nav-link:hover { background: var(--muted); color: var(--fg); }
+    .nav-link.active { background: var(--primary-a); color: var(--primary); font-weight: 600; }
+    .sidebar-footer {
+      padding: 12px 18px;
+      border-top: 1px solid var(--border);
+      font-size: 11px; color: var(--fg-muted);
+    }
+
+    /* ── Main ── */
+    .main {
+      margin-left: var(--sidebar-w);
+      flex: 1; padding: 44px 48px;
+      max-width: calc(var(--sidebar-w) + 900px);
+    }
+
+    /* ── Cover ── */
+    .cover {
+      background: linear-gradient(135deg, #1a0a00 0%, #2d1200 40%, #1E1E1E 100%);
+      border: 1px solid var(--border);
+      border-left: 4px solid var(--primary);
+      border-radius: var(--radius);
+      padding: 44px 40px;
+      margin-bottom: 48px;
+      position: relative;
+      overflow: hidden;
+    }
+    .cover::before {
+      content: '🎾';
+      position: absolute; right: 40px; top: 50%;
+      transform: translateY(-50%);
+      font-size: 80px; opacity: .08;
+    }
+    .cover h1 { font-size: 34px; font-weight: 800; color: var(--fg); margin-bottom: 6px; }
+    .cover h1 span { color: var(--primary); }
+    .cover .subtitle { font-size: 15px; color: var(--fg-muted); margin-bottom: 24px; }
+    .cover-badges { display: flex; flex-wrap: wrap; gap: 7px; }
+    .cbadge {
+      display: inline-flex; align-items: center; gap: 5px;
+      padding: 4px 11px; border-radius: 999px;
+      font-size: 11.5px; font-weight: 600;
+      border: 1px solid var(--border);
+      background: var(--card2); color: var(--fg-muted);
+    }
+    .cbadge.orange { border-color: var(--primary); background: var(--primary-a); color: var(--primary); }
+
+    /* ── Sections ── */
+    section { margin-bottom: 60px; scroll-margin-top: 28px; }
+    h2 {
+      font-size: 22px; font-weight: 700; color: var(--fg);
+      margin-bottom: 6px; padding-bottom: 12px;
+      border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; gap: 10px;
+    }
+    h2 .icon { font-size: 20px; }
+    h3 { font-size: 16px; font-weight: 700; color: var(--fg); margin: 28px 0 10px; }
+    h4 {
+      font-size: 11px; font-weight: 700;
+      text-transform: uppercase; letter-spacing: .08em;
+      color: var(--fg-muted); margin: 20px 0 8px;
+    }
+    p { margin-bottom: 12px; color: var(--fg-muted); }
+    ul, ol { margin-left: 20px; margin-bottom: 12px; color: var(--fg-muted); }
+    li { margin-bottom: 5px; }
+    strong { color: var(--fg); font-weight: 600; }
+    a { color: var(--primary); text-decoration: none; }
+
+    /* ── Cards ── */
+    .card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px 22px; margin-bottom: 16px; }
+    .card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px,1fr)); gap: 12px; margin-bottom: 24px; }
+    .card-mini { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px 16px; }
+    .card-mini .ci { font-size: 26px; margin-bottom: 10px; }
+    .card-mini h4 { margin: 0 0 6px; }
+    .card-mini p { font-size: 13px; margin: 0; }
+    .card-mini:hover { border-color: var(--primary); }
+
+    /* ── Code ── */
+    pre {
+      background: #0d0d0d; border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 16px 20px;
+      overflow-x: auto; font-size: 13px; line-height: 1.75;
+      margin: 12px 0 20px;
+      font-family: 'JetBrains Mono', 'Fira Code', ui-monospace, monospace;
+    }
+    code {
+      background: var(--card2); color: var(--primary);
+      border-radius: 5px; padding: 2px 7px;
+      font-size: 12.5px;
+      font-family: 'JetBrains Mono', 'Fira Code', ui-monospace, monospace;
+    }
+    pre code { background: none; color: inherit; padding: 0; font-size: inherit; }
+    .kw  { color: var(--purple); }
+    .str { color: var(--green); }
+    .cm  { color: #555; font-style: italic; }
+    .fn  { color: var(--blue); }
+    .tp  { color: var(--yellow); }
+    .nm  { color: var(--primary); }
+
+    /* ── Tables ── */
+    .tbl-wrap { border-radius: var(--radius); overflow: hidden; border: 1px solid var(--border); margin-bottom: 20px; }
+    table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+    th {
+      background: var(--card2); text-align: left;
+      padding: 10px 14px; font-size: 11px; font-weight: 700;
+      text-transform: uppercase; letter-spacing: .06em;
+      color: var(--fg-muted); border-bottom: 1px solid var(--border);
+    }
+    td { padding: 10px 14px; border-bottom: 1px solid var(--border); color: var(--fg-muted); vertical-align: top; }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: rgba(255,255,255,.02); }
+
+    /* ── Method badges ── */
+    .method {
+      display: inline-block; padding: 2px 8px;
+      border-radius: 5px; font-size: 11px; font-weight: 700;
+      font-family: monospace; margin-right: 6px; min-width: 52px; text-align: center;
+    }
+    .get    { background: var(--blue-a);   color: var(--blue);   border: 1px solid rgba(96,165,250,.3); }
+    .post   { background: var(--green-a);  color: var(--green);  border: 1px solid rgba(52,211,153,.3); }
+    .put    { background: var(--yellow-a); color: var(--yellow); border: 1px solid rgba(251,191,36,.3); }
+    .patch  { background: var(--primary-a);color: var(--primary);border: 1px solid rgba(255,120,53,.3); }
+    .delete { background: rgba(239,68,68,.12); color: var(--destructive); border: 1px solid rgba(239,68,68,.3); }
+
+    /* ── Info boxes ── */
+    .info { border-left: 3px solid; border-radius: 0 8px 8px 0; padding: 13px 16px; margin: 14px 0 20px; }
+    .info p { margin: 0; font-size: 13.5px; }
+    .info.orange { border-color: var(--primary); background: var(--primary-a); }
+    .info.green  { border-color: var(--green);   background: var(--green-a); }
+    .info.blue   { border-color: var(--blue);    background: var(--blue-a); }
+    .info.yellow { border-color: var(--yellow);  background: var(--yellow-a); }
+
+    /* ── Flow ── */
+    .flow { display: flex; align-items: center; flex-wrap: wrap; gap: 0; margin: 20px 0 24px; }
+    .flow-step {
+      background: var(--primary-a); border: 1px solid var(--primary);
+      color: var(--primary); border-radius: 8px;
+      padding: 9px 14px; font-size: 12.5px; font-weight: 600;
+      text-align: center; min-width: 100px;
+    }
+    .flow-arrow { color: var(--fg-muted); font-size: 18px; padding: 0 5px; }
+
+    /* ── Entities ── */
+    .entities-grid { display: flex; flex-wrap: wrap; gap: 10px; margin: 16px 0 24px; }
+    .entity {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 8px; overflow: hidden;
+      display: inline-block; min-width: 165px;
+    }
+    .entity:hover { border-color: var(--primary); }
+    .entity-header { background: var(--primary); color: #fff; padding: 7px 12px; font-size: 12px; font-weight: 700; }
+    .entity-field { padding: 4px 12px; font-size: 11.5px; color: var(--fg-muted); border-bottom: 1px solid var(--border); }
+    .entity-field:last-child { border-bottom: none; }
+    .pk { color: var(--yellow); font-weight: 700; font-size: 10px; margin-right: 4px; }
+    .fk { color: var(--blue);   font-weight: 700; font-size: 10px; margin-right: 4px; }
+
+    /* ── Mockup shell ── */
+    .mockup {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: var(--radius); overflow: hidden;
+      margin: 14px 0 28px;
+      box-shadow: 0 8px 32px rgba(0,0,0,.4);
+    }
+    .mockup-bar {
+      background: #0d0d0d; border-bottom: 1px solid var(--border);
+      padding: 9px 14px; display: flex; align-items: center; gap: 6px;
+    }
+    .dot { width: 10px; height: 10px; border-radius: 50%; }
+    .dot.r { background: #f87171; }
+    .dot.y { background: #fbbf24; }
+    .dot.g { background: #4ade80; }
+    .murl {
+      background: var(--muted); border-radius: 4px;
+      padding: 2px 12px; font-size: 11px; color: var(--fg-muted);
+      margin-left: 10px; font-family: monospace;
+    }
+    .mockup-body { padding: 20px; }
+
+    /* App shell mockup */
+    .app-shell { display: flex; height: 370px; }
+    .app-sb {
+      width: 196px; background: var(--card); border-right: 1px solid var(--border);
+      flex-shrink: 0; display: flex; flex-direction: column;
+    }
+    .app-sb-logo {
+      padding: 14px 14px 12px; border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; gap: 9px;
+    }
+    .app-sb-logo .ball { width: 28px; height: 28px; background: var(--primary); border-radius: 50%; display:flex;align-items:center;justify-content:center;font-size:14px; }
+    .app-sb-logo .name { font-size: 13px; font-weight: 700; color: var(--fg); }
+    .app-sb-logo .sub  { font-size: 10px; color: var(--fg-muted); }
+    .app-sb-item {
+      display: flex; align-items: center; gap: 9px;
+      padding: 8px 14px; font-size: 12.5px; font-weight: 500;
+      color: var(--fg-muted); cursor: pointer;
+      border-radius: 6px; margin: 2px 6px;
+    }
+    .app-sb-item.active { background: var(--primary); color: #fff; }
+    .app-sb-item:not(.active):hover { background: var(--muted); color: var(--fg); }
+    .app-content { flex: 1; background: var(--bg); overflow: auto; padding: 18px; }
+
+    /* Tournament cards */
+    .t-card {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 8px; padding: 12px 14px; margin-bottom: 7px;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .t-card:hover { border-color: var(--primary); }
+    .t-name  { font-size: 13px; font-weight: 600; color: var(--fg); }
+    .t-sub   { font-size: 11px; color: var(--fg-muted); margin-top: 2px; }
+    .tbadge  { font-size: 10px; font-weight: 700; padding: 3px 9px; border-radius: 999px; }
+    .tbadge.draft  { background: var(--muted); color: var(--fg-muted); }
+    .tbadge.active { background: var(--primary); color: #fff; }
+    .tbadge.done   { background: var(--green-a); color: var(--green); border: 1px solid rgba(52,211,153,.3); }
+
+    /* Tabs */
+    .tabs-bar { display: flex; border-bottom: 1px solid var(--border); margin-bottom: 14px; }
+    .tab { padding: 8px 16px; font-size: 12.5px; font-weight: 500; color: var(--fg-muted); border-bottom: 2px solid transparent; margin-bottom: -1px; cursor: pointer; }
+    .tab.active { color: var(--primary); border-bottom-color: var(--primary); font-weight: 600; }
+
+    /* Zone cards */
+    .zone-card { background: var(--card2); border: 1px solid var(--border); border-radius: 8px; margin-bottom: 8px; overflow: hidden; }
+    .zone-header { padding: 9px 14px; display: flex; align-items: center; justify-content: space-between; background: var(--card); border-bottom: 1px solid var(--border); }
+    .zone-name { font-size: 13px; font-weight: 700; color: var(--fg); }
+    .zone-tag { font-size: 10px; background: var(--muted); color: var(--fg-muted); padding: 2px 7px; border-radius: 4px; }
+    .zone-body { padding: 10px 14px; }
+    .zone-pair { font-size: 12px; color: var(--fg-muted); padding: 5px 0; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+    .zone-pair:last-child { border-bottom: none; }
+    .zone-pts { font-size: 11px; color: var(--primary); font-weight: 600; }
+
+    /* Match cards */
+    .match-card { background: var(--card2); border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; margin-bottom: 6px; }
+    .match-row { display: flex; align-items: center; gap: 10px; }
+    .match-name { flex: 1; font-size: 12.5px; }
+    .match-name.winner { color: var(--fg); font-weight: 600; }
+    .match-name.loser  { color: var(--fg-muted); }
+    .match-scores { display: flex; gap: 8px; margin-left: auto; }
+    .score-col { display: flex; flex-direction: column; align-items: center; gap: 3px; width: 20px; }
+    .score-num { font-size: 13px; font-weight: 700; line-height: 1; }
+    .score-num.w { color: var(--fg); }
+    .score-num.l { color: var(--fg-muted); font-weight: 400; }
+    .check { color: var(--primary); font-size: 13px; }
+    .match-meta { font-size: 10.5px; color: var(--fg-muted); margin-top: 8px; display: flex; align-items: center; gap: 8px; }
+    .mbadge { font-size: 10px; padding: 2px 7px; border-radius: 4px; font-weight: 600; }
+    .mbadge.played { background: var(--green-a); color: var(--green); border: 1px solid rgba(52,211,153,.3); }
+    .mbadge.sched  { background: var(--blue-a);  color: var(--blue);  border: 1px solid rgba(96,165,250,.3); }
+    .mbadge.pend   { background: var(--muted);   color: var(--fg-muted); }
+
+    /* Bracket */
+    .bracket-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+    .round-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: var(--primary); margin-bottom: 8px; }
+    .b-match { background: var(--card2); border: 1px solid var(--border); border-radius: 7px; padding: 9px 12px; margin-bottom: 7px; }
+    .b-pair { padding: 3px 0; font-size: 12px; display: flex; justify-content: space-between; }
+    .b-pair.winner { color: var(--primary); font-weight: 600; }
+    .b-pair.tbd    { color: var(--border); font-style: italic; }
+    .b-pair.bye    { color: var(--fg-muted); font-style: italic; font-size: 11px; }
+
+    /* Pairs */
+    .pair-row { background: var(--card2); border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; margin-bottom: 6px; display: flex; align-items: center; justify-content: space-between; }
+    .pair-row:hover { border-color: var(--primary); }
+    .pair-name { font-size: 13px; font-weight: 600; color: var(--fg); }
+    .pair-sub  { font-size: 11px; color: var(--fg-muted); margin-top: 2px; }
+    .pair-pts  { background: var(--primary-a); border: 1px solid rgba(255,120,53,.3); color: var(--primary); font-size: 12px; font-weight: 700; padding: 4px 10px; border-radius: 999px; }
+
+    /* ── Tiebreaker ── */
+    .tb-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+    .tb-box { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+    .tb-header { background: var(--primary); color: #fff; padding: 10px 16px; font-size: 13px; font-weight: 700; }
+    .tb-row { display: flex; align-items: center; gap: 12px; padding: 9px 16px; border-bottom: 1px solid var(--border); }
+    .tb-row:last-child { border-bottom: none; }
+    .tb-num { width: 22px; height: 22px; background: var(--primary-a); border: 1px solid rgba(255,120,53,.3); color: var(--primary); border-radius: 50%; font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .tb-num.h2h { background: var(--blue-a); border-color: rgba(96,165,250,.3); color: var(--blue); }
+    .tb-label { font-size: 13px; color: var(--fg-muted); }
+
+    /* ── Folder tree ── */
+    .tree { font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 13px; line-height: 1.9; }
+    .tree .dir  { color: var(--yellow); }
+    .tree .file { color: var(--fg-muted); }
+    .tree .cmt  { color: #444; font-style: italic; }
+
+    @media (max-width: 800px) {
+      .sidebar { display: none; }
+      .main { margin-left: 0; padding: 20px; }
+      .app-shell { height: auto; flex-direction: column; }
+      .app-sb { width: 100%; }
+      .bracket-grid { grid-template-columns: 1fr; }
+      .tb-grid { grid-template-columns: 1fr; }
+      .card-grid { grid-template-columns: 1fr 1fr; }
+    }
+  </style>
+</head>
+<body>
+<div class="layout">
+
+<!-- ══════════ SIDEBAR ══════════ -->
+<aside class="sidebar">
+  <div class="sidebar-header">
+    <div class="sidebar-logo">
+      <div class="logo-ball">🎾</div>
+      <div>
+        <div>PadelAdmin</div>
+        <div class="logo-sub">CODE SOLUTIONS.ar</div>
+      </div>
+    </div>
+  </div>
+  <nav>
+    <div class="nav-section">General</div>
+    <a class="nav-link" href="#overview">📋 Descripción</a>
+    <a class="nav-link" href="#stack">⚙️ Stack tecnológico</a>
+    <a class="nav-link" href="#flujo">🔄 Flujo del torneo</a>
+
+    <div class="nav-section">Backend</div>
+    <a class="nav-link" href="#be-estructura">🗂️ Estructura</a>
+    <a class="nav-link" href="#entidades">🗃️ Entidades</a>
+    <a class="nav-link" href="#endpoints">🔌 API Endpoints</a>
+    <a class="nav-link" href="#servicios">⚙️ Servicios clave</a>
+    <a class="nav-link" href="#desempate">⚖️ Reglas de desempate</a>
+
+    <div class="nav-section">Frontend</div>
+    <a class="nav-link" href="#fe-estructura">📁 Estructura</a>
+    <a class="nav-link" href="#paginas">🖥️ Páginas</a>
+    <a class="nav-link" href="#componentes">🧩 Componentes</a>
+
+    <div class="nav-section">Funcionalidades</div>
+    <a class="nav-link" href="#f-torneos">🏆 Torneos</a>
+    <a class="nav-link" href="#f-parejas">👥 Parejas</a>
+    <a class="nav-link" href="#f-zonas">🟧 Zonas</a>
+    <a class="nav-link" href="#f-fixture">📅 Fixture</a>
+    <a class="nav-link" href="#f-bracket">🏅 Bracket</a>
+  </nav>
+  <div class="sidebar-footer">v1.0.0 · Documentación 2025</div>
+</aside>
+
+<!-- ══════════ MAIN ══════════ -->
+<main class="main">
+
+  <!-- COVER -->
+  <div class="cover">
+    <h1><span>Padel</span>Admin</h1>
+    <div class="subtitle">Plataforma de gestión integral de torneos de pádel — Documentación técnica</div>
+    <div class="cover-badges">
+      <span class="cbadge orange">Java 21</span>
+      <span class="cbadge orange">Spring Boot 3</span>
+      <span class="cbadge orange">PostgreSQL</span>
+      <span class="cbadge">React 19</span>
+      <span class="cbadge">TypeScript</span>
+      <span class="cbadge">Tailwind v4</span>
+      <span class="cbadge">shadcn/ui</span>
+      <span class="cbadge">TanStack Query</span>
+    </div>
+  </div>
+
+  <!-- ══ OVERVIEW ══ -->
+  <section id="overview">
+    <h2><span class="icon">📋</span> Descripción del proyecto</h2>
+    <p>PadelAdmin es una aplicación web de gestión integral de torneos de pádel. Cubre todo el ciclo de vida de un torneo: inscripción de parejas, generación automática de zonas, programación de fixture con respeto de restricciones horarias, registro de resultados, tabla de posiciones en tiempo real y generación del bracket eliminatorio oficial.</p>
+    <div class="card-grid">
+      <div class="card-mini"><div class="ci">🏆</div><h4>Torneos</h4><p>Creación y gestión del ciclo completo con categorías y complejos.</p></div>
+      <div class="card-mini"><div class="ci">👥</div><h4>Parejas</h4><p>Inscripción con restricciones y preferencias horarias.</p></div>
+      <div class="card-mini"><div class="ci">🟧</div><h4>Zonas</h4><p>Generación snake por puntos. Intercambio de parejas entre zonas.</p></div>
+      <div class="card-mini"><div class="ci">📅</div><h4>Fixture</h4><p>Scheduling automático respetando disponibilidad y restricciones.</p></div>
+      <div class="card-mini"><div class="ci">📊</div><h4>Posiciones</h4><p>Tabla en tiempo real con criterios oficiales de desempate.</p></div>
+      <div class="card-mini"><div class="ci">🏅</div><h4>Bracket</h4><p>Templates oficiales de pádel según total de inscriptos.</p></div>
+    </div>
+  </section>
+
+  <!-- ══ STACK ══ -->
+  <section id="stack">
+    <h2><span class="icon">⚙️</span> Stack tecnológico</h2>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
+      <div>
+        <h3>Backend</h3>
+        <div class="tbl-wrap"><table>
+          <tr><th>Tecnología</th><th>Versión</th><th>Uso</th></tr>
+          <tr><td><strong>Java</strong></td><td>21</td><td>Lenguaje principal</td></tr>
+          <tr><td><strong>Spring Boot</strong></td><td>3.x</td><td>Framework REST API</td></tr>
+          <tr><td><strong>Spring Data JPA</strong></td><td>—</td><td>ORM / repositorios</td></tr>
+          <tr><td><strong>Hibernate</strong></td><td>—</td><td>ddl-auto: update</td></tr>
+          <tr><td><strong>PostgreSQL</strong></td><td>15+</td><td>Base de datos</td></tr>
+          <tr><td><strong>Lombok</strong></td><td>—</td><td>Reducción boilerplate</td></tr>
+          <tr><td><strong>Maven</strong></td><td>—</td><td>Build / dependencias</td></tr>
+        </table></div>
+      </div>
+      <div>
+        <h3>Frontend</h3>
+        <div class="tbl-wrap"><table>
+          <tr><th>Tecnología</th><th>Versión</th><th>Uso</th></tr>
+          <tr><td><strong>React</strong></td><td>19</td><td>UI framework</td></tr>
+          <tr><td><strong>TypeScript</strong></td><td>5.x</td><td>Tipado estático</td></tr>
+          <tr><td><strong>Vite</strong></td><td>6.x</td><td>Bundler / dev server</td></tr>
+          <tr><td><strong>Tailwind CSS</strong></td><td>v4</td><td>Utilidades CSS</td></tr>
+          <tr><td><strong>shadcn/ui</strong></td><td>—</td><td>Componentes UI</td></tr>
+          <tr><td><strong>TanStack Query</strong></td><td>v5</td><td>Server state / cache</td></tr>
+          <tr><td><strong>React Router</strong></td><td>v6</td><td>Navegación SPA</td></tr>
+          <tr><td><strong>Axios + Sonner</strong></td><td>—</td><td>HTTP / notificaciones</td></tr>
+        </table></div>
+      </div>
+    </div>
+    <h4>Paleta de colores</h4>
+    <div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:20px;">
+      <div style="background:#FF7835;border-radius:8px;padding:10px 16px;font-size:12px;font-weight:700;color:#fff;">Primary #FF7835</div>
+      <div style="background:#121212;border:1px solid #2A2A2A;border-radius:8px;padding:10px 16px;font-size:12px;font-weight:700;color:#fff;">Background #121212</div>
+      <div style="background:#1E1E1E;border:1px solid #2A2A2A;border-radius:8px;padding:10px 16px;font-size:12px;font-weight:700;color:#fff;">Card #1E1E1E</div>
+      <div style="background:#2A2A2A;border-radius:8px;padding:10px 16px;font-size:12px;font-weight:700;color:#A0A0A0;">Border #2A2A2A</div>
+      <div style="background:#34D399;border-radius:8px;padding:10px 16px;font-size:12px;font-weight:700;color:#121212;">Green #34D399</div>
+      <div style="background:#60A5FA;border-radius:8px;padding:10px 16px;font-size:12px;font-weight:700;color:#121212;">Blue #60A5FA</div>
+      <div style="background:#FBBF24;border-radius:8px;padding:10px 16px;font-size:12px;font-weight:700;color:#121212;">Yellow #FBBF24</div>
+      <div style="background:#EF4444;border-radius:8px;padding:10px 16px;font-size:12px;font-weight:700;color:#fff;">Destructive #EF4444</div>
+    </div>
+  </section>
+
+  <!-- ══ FLUJO ══ -->
+  <section id="flujo">
+    <h2><span class="icon">🔄</span> Flujo del torneo</h2>
+    <div class="flow">
+      <div class="flow-step">1. Crear Torneo</div><div class="flow-arrow">→</div>
+      <div class="flow-step">2. Inscribir Parejas</div><div class="flow-arrow">→</div>
+      <div class="flow-step">3. Generar Zonas</div><div class="flow-arrow">→</div>
+      <div class="flow-step">4. Generar Fixture</div><div class="flow-arrow">→</div>
+      <div class="flow-step">5. Resultados</div><div class="flow-arrow">→</div>
+      <div class="flow-step">6. Bracket</div><div class="flow-arrow">→</div>
+      <div class="flow-step">7. Finalizar</div>
+    </div>
+    <div class="info blue"><p><strong>Estados:</strong> <code>DRAFT</code> → edición libre &nbsp;|&nbsp; <code>ACTIVE</code> → operativo &nbsp;|&nbsp; <code>COMPLETED</code> → cerrado</p></div>
+    <div class="tbl-wrap"><table>
+      <tr><th>#</th><th>Etapa</th><th>Resultado</th><th>Requisito previo</th></tr>
+      <tr><td>1</td><td>Crear torneo</td><td>Torneo en DRAFT</td><td>Categoría y complejo creados</td></tr>
+      <tr><td>2</td><td>Configurar días de zona</td><td>Días habilitados para partidos de zona</td><td>Torneo existente</td></tr>
+      <tr><td>3</td><td>Inscribir parejas</td><td>Mín. 9 parejas</td><td>Jugadores registrados</td></tr>
+      <tr><td>4</td><td>Agregar restricciones</td><td>Horarios bloqueados/preferidos por pareja</td><td>Parejas inscriptas</td></tr>
+      <tr><td>5</td><td>Generar zonas</td><td>Zonas A, B, C… con distribución snake</td><td>Mín. 9 parejas</td></tr>
+      <tr><td>6</td><td>Intercambiar parejas</td><td>Reordenamiento manual entre zonas</td><td>Sin resultados cargados</td></tr>
+      <tr><td>7</td><td>Generar fixture</td><td>Partidos programados en canchas y horarios</td><td>Zonas generadas</td></tr>
+      <tr><td>8</td><td>Cargar resultados</td><td>Posiciones actualizadas; ronda 2 en zona de 4</td><td>Partidos generados</td></tr>
+      <tr><td>9</td><td>Generar bracket</td><td>Cuadro eliminatorio con seeds oficiales</td><td>Todos los partidos de zona PLAYED</td></tr>
+      <tr><td>10</td><td>Resultados eliminatoria</td><td>Ganadores avanzan automáticamente</td><td>Bracket generado</td></tr>
+      <tr><td>11</td><td>Finalizar torneo</td><td>Estado COMPLETED</td><td>—</td></tr>
+    </table></div>
+  </section>
+
+  <!-- ══ BACKEND ESTRUCTURA ══ -->
+  <section id="be-estructura">
+    <h2><span class="icon">🗂️</span> Estructura del backend</h2>
+    <div class="card">
+      <div class="tree">
+        <div><span class="dir">backend/src/main/java/com/padeladmin/padeladmin/</span></div>
+        <div>├── <span class="dir">config/</span></div>
+        <div>│   ├── <span class="file">CorsConfig.java</span>         <span class="cmt"># Permite frontend local</span></div>
+        <div>│   └── <span class="file">SecurityConfig.java</span>     <span class="cmt"># Spring Security (auth en desarrollo)</span></div>
+        <div>├── <span class="dir">controller/</span>             <span class="cmt"># REST Controllers</span></div>
+        <div>│   ├── <span class="file">TournamentController.java</span></div>
+        <div>│   ├── <span class="file">PairController.java</span></div>
+        <div>│   ├── <span class="file">ZoneController.java</span></div>
+        <div>│   ├── <span class="file">FixtureController.java</span></div>
+        <div>│   ├── <span class="file">MatchResultController.java</span></div>
+        <div>│   ├── <span class="file">EliminationController.java</span></div>
+        <div>│   ├── <span class="file">PlayerController.java</span></div>
+        <div>│   ├── <span class="file">CategoryController.java</span></div>
+        <div>│   └── <span class="file">ComplexController.java</span></div>
+        <div>├── <span class="dir">service/</span>                <span class="cmt"># Lógica de negocio</span></div>
+        <div>│   ├── <span class="file">ZoneService.java</span>        <span class="cmt"># Generación snake + swap de parejas</span></div>
+        <div>│   ├── <span class="file">FixtureService.java</span>     <span class="cmt"># Scheduling automático</span></div>
+        <div>│   ├── <span class="file">MatchResultService.java</span> <span class="cmt"># Resultados + posiciones + desempate</span></div>
+        <div>│   └── <span class="file">EliminationService.java</span> <span class="cmt"># Bracket oficial por inscriptos</span></div>
+        <div>├── <span class="dir">entity/</span>                 <span class="cmt"># Entidades JPA → tablas PostgreSQL</span></div>
+        <div>├── <span class="dir">dto/</span>                    <span class="cmt"># Request / Response DTOs</span></div>
+        <div>├── <span class="dir">repository/</span>             <span class="cmt"># Spring Data JPA repositories</span></div>
+        <div>├── <span class="dir">enums/</span>                  <span class="cmt"># TournamentStatus, MatchStatus, MatchPhase…</span></div>
+        <div>└── <span class="dir">exception/</span>              <span class="cmt"># BusinessException + GlobalExceptionHandler</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══ ENTIDADES ══ -->
+  <section id="entidades">
+    <h2><span class="icon">🗃️</span> Modelo de datos</h2>
+    <div class="entities-grid">
+      <div class="entity">
+        <div class="entity-header">Tournament</div>
+        <div class="entity-field"><span class="pk">PK</span> id</div>
+        <div class="entity-field">name</div>
+        <div class="entity-field">startDate / endDate</div>
+        <div class="entity-field"><span class="fk">FK</span> categoryId</div>
+        <div class="entity-field"><span class="fk">FK</span> complexId</div>
+        <div class="entity-field">matchDurationMinutes</div>
+        <div class="entity-field">minIntervalMinutes</div>
+        <div class="entity-field">status (DRAFT/ACTIVE/COMPLETED)</div>
+        <div class="entity-field">zoneDays [ ]</div>
+      </div>
+      <div class="entity">
+        <div class="entity-header">Pair</div>
+        <div class="entity-field"><span class="pk">PK</span> id</div>
+        <div class="entity-field"><span class="fk">FK</span> tournamentId</div>
+        <div class="entity-field">totalPoints</div>
+      </div>
+      <div class="entity">
+        <div class="entity-header">PairPlayer</div>
+        <div class="entity-field"><span class="pk">PK</span> id</div>
+        <div class="entity-field"><span class="fk">FK</span> pairId</div>
+        <div class="entity-field"><span class="fk">FK</span> playerId</div>
+        <div class="entity-field"><span class="fk">FK</span> categoryId</div>
+        <div class="entity-field">points (en categoría)</div>
+      </div>
+      <div class="entity">
+        <div class="entity-header">Zone</div>
+        <div class="entity-field"><span class="pk">PK</span> id</div>
+        <div class="entity-field">name (A, B, C…)</div>
+        <div class="entity-field">zoneSize (3 ó 4)</div>
+        <div class="entity-field">zoneOrder</div>
+        <div class="entity-field"><span class="fk">FK</span> tournamentId</div>
+      </div>
+      <div class="entity">
+        <div class="entity-header">ZonePair</div>
+        <div class="entity-field"><span class="pk">PK</span> id</div>
+        <div class="entity-field"><span class="fk">FK</span> zoneId</div>
+        <div class="entity-field"><span class="fk">FK</span> pairId</div>
+        <div class="entity-field">position</div>
+        <div class="entity-field" style="font-size:10px;color:#555;">UC: (zoneId, pairId)</div>
+        <div class="entity-field" style="font-size:10px;color:#555;">UC: (zoneId, position)</div>
+      </div>
+      <div class="entity">
+        <div class="entity-header">Match</div>
+        <div class="entity-field"><span class="pk">PK</span> id</div>
+        <div class="entity-field"><span class="fk">FK</span> tournamentId</div>
+        <div class="entity-field"><span class="fk">FK</span> zoneId (nullable)</div>
+        <div class="entity-field">phase (ZONE / ELIMINATION)</div>
+        <div class="entity-field">status</div>
+        <div class="entity-field"><span class="fk">FK</span> pair1Id, pair2Id</div>
+        <div class="entity-field"><span class="fk">FK</span> courtId</div>
+        <div class="entity-field">scheduledStart / End</div>
+        <div class="entity-field">eliminationRound, bracketSlot</div>
+        <div class="entity-field">zoneRound (1 ó 2)</div>
+        <div class="entity-field">bye (boolean)</div>
+      </div>
+      <div class="entity">
+        <div class="entity-header">MatchResult</div>
+        <div class="entity-field"><span class="pk">PK</span> id</div>
+        <div class="entity-field"><span class="fk">FK</span> matchId</div>
+        <div class="entity-field">pair1Score / pair2Score</div>
+        <div class="entity-field"><span class="fk">FK</span> winnerPairId</div>
+        <div class="entity-field">recordedAt</div>
+      </div>
+      <div class="entity">
+        <div class="entity-header">MatchSet</div>
+        <div class="entity-field"><span class="pk">PK</span> id</div>
+        <div class="entity-field"><span class="fk">FK</span> matchResultId</div>
+        <div class="entity-field">setNumber</div>
+        <div class="entity-field">pair1Games / pair2Games</div>
+      </div>
+      <div class="entity">
+        <div class="entity-header">Player</div>
+        <div class="entity-field"><span class="pk">PK</span> id</div>
+        <div class="entity-field">firstName, lastName</div>
+        <div class="entity-field">phone</div>
+        <div class="entity-field">telegramChatId</div>
+      </div>
+      <div class="entity">
+        <div class="entity-header">PairScheduleConstraint</div>
+        <div class="entity-field"><span class="pk">PK</span> id</div>
+        <div class="entity-field"><span class="fk">FK</span> pairId</div>
+        <div class="entity-field">type (RESTRICTION / PREFERENCE)</div>
+        <div class="entity-field">dayOfWeek (1=Lun…7=Dom)</div>
+        <div class="entity-field">slotStart / slotEnd</div>
+      </div>
+      <div class="entity">
+        <div class="entity-header">Court / CourtAvailability</div>
+        <div class="entity-field"><span class="pk">PK</span> id</div>
+        <div class="entity-field"><span class="fk">FK</span> complexId</div>
+        <div class="entity-field">name, active</div>
+        <div class="entity-field">dayOfWeek, openTime, closeTime</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══ ENDPOINTS ══ -->
+  <section id="endpoints">
+    <h2><span class="icon">🔌</span> API Endpoints</h2>
+    <div class="info blue"><p>Base URL: <code>http://localhost:8080/api</code></p></div>
+
+    <h3>Torneos</h3>
+    <div class="tbl-wrap"><table>
+      <tr><th>Método</th><th>Endpoint</th><th>Descripción</th></tr>
+      <tr><td><span class="method get">GET</span></td><td><code>/tournaments</code></td><td>Listar torneos (filtrable por <code>?status=</code>)</td></tr>
+      <tr><td><span class="method get">GET</span></td><td><code>/tournaments/{id}</code></td><td>Detalle de un torneo</td></tr>
+      <tr><td><span class="method post">POST</span></td><td><code>/tournaments</code></td><td>Crear torneo</td></tr>
+      <tr><td><span class="method put">PUT</span></td><td><code>/tournaments/{id}</code></td><td>Editar torneo</td></tr>
+      <tr><td><span class="method patch">PATCH</span></td><td><code>/tournaments/{id}/status</code></td><td>Cambiar estado (<code>?status=ACTIVE</code>)</td></tr>
+      <tr><td><span class="method put">PUT</span></td><td><code>/tournaments/{id}/zone-days</code></td><td>Días habilitados para zona (body: <code>[1,2,6,7]</code>)</td></tr>
+      <tr><td><span class="method delete">DELETE</span></td><td><code>/tournaments/{id}</code></td><td>Eliminar torneo</td></tr>
+    </table></div>
+
+    <h3>Parejas</h3>
+    <div class="tbl-wrap"><table>
+      <tr><th>Método</th><th>Endpoint</th><th>Descripción</th></tr>
+      <tr><td><span class="method get">GET</span></td><td><code>/tournaments/{tId}/pairs</code></td><td>Listar parejas</td></tr>
+      <tr><td><span class="method post">POST</span></td><td><code>/tournaments/{tId}/pairs</code></td><td>Inscribir pareja</td></tr>
+      <tr><td><span class="method delete">DELETE</span></td><td><code>/tournaments/{tId}/pairs/{pId}</code></td><td>Eliminar pareja</td></tr>
+      <tr><td><span class="method post">POST</span></td><td><code>/tournaments/{tId}/pairs/{pId}/constraints</code></td><td>Agregar restricción/preferencia</td></tr>
+      <tr><td><span class="method delete">DELETE</span></td><td><code>/tournaments/{tId}/pairs/{pId}/constraints/{cId}</code></td><td>Eliminar restricción</td></tr>
+    </table></div>
+
+    <h3>Zonas</h3>
+    <div class="tbl-wrap"><table>
+      <tr><th>Método</th><th>Endpoint</th><th>Descripción</th></tr>
+      <tr><td><span class="method post">POST</span></td><td><code>/tournaments/{tId}/zones/generate</code></td><td>Generar zonas automáticamente (snake)</td></tr>
+      <tr><td><span class="method get">GET</span></td><td><code>/tournaments/{tId}/zones</code></td><td>Listar zonas con parejas</td></tr>
+      <tr><td><span class="method patch">PATCH</span></td><td><code>/tournaments/{tId}/zones/pairs/{pId}/swap</code></td><td>Intercambiar pareja entre zonas</td></tr>
+      <tr><td><span class="method patch">PATCH</span></td><td><code>/tournaments/{tId}/zones/pairs/{pId}/move</code></td><td>Mover pareja (requiere espacio)</td></tr>
+    </table></div>
+
+    <h3>Fixture</h3>
+    <div class="tbl-wrap"><table>
+      <tr><th>Método</th><th>Endpoint</th><th>Descripción</th></tr>
+      <tr><td><span class="method post">POST</span></td><td><code>/tournaments/{tId}/fixture/generate</code></td><td>Generar y programar fixture</td></tr>
+      <tr><td><span class="method get">GET</span></td><td><code>/tournaments/{tId}/fixture</code></td><td>Ver fixture actual</td></tr>
+      <tr><td><span class="method post">POST</span></td><td><code>/tournaments/{tId}/fixture/schedule-pending</code></td><td>Programar partidos PENDING (ronda 2 zona de 4)</td></tr>
+    </table></div>
+
+    <h3>Resultados y Posiciones</h3>
+    <div class="tbl-wrap"><table>
+      <tr><th>Método</th><th>Endpoint</th><th>Descripción</th></tr>
+      <tr><td><span class="method post">POST</span></td><td><code>/matches/{matchId}/result</code></td><td>Registrar resultado</td></tr>
+      <tr><td><span class="method get">GET</span></td><td><code>/matches/{matchId}/result</code></td><td>Obtener resultado</td></tr>
+      <tr><td><span class="method get">GET</span></td><td><code>/zones/{zoneId}/standings</code></td><td>Tabla de posiciones de zona</td></tr>
+    </table></div>
+
+    <h3>Bracket Eliminatorio</h3>
+    <div class="tbl-wrap"><table>
+      <tr><th>Método</th><th>Endpoint</th><th>Descripción</th></tr>
+      <tr><td><span class="method post">POST</span></td><td><code>/tournaments/{tId}/elimination/generate</code></td><td>Generar bracket desde clasificados</td></tr>
+      <tr><td><span class="method get">GET</span></td><td><code>/tournaments/{tId}/elimination</code></td><td>Ver bracket actual</td></tr>
+    </table></div>
+
+    <h3>Ejemplo: registrar resultado</h3>
+    <pre><code><span class="cm">// POST /api/matches/42/result</span>
+{
+  <span class="str">"sets"</span>: [
+    { <span class="str">"pair1Games"</span>: <span class="nm">6</span>, <span class="str">"pair2Games"</span>: <span class="nm">3</span> },
+    { <span class="str">"pair1Games"</span>: <span class="nm">6</span>, <span class="str">"pair2Games"</span>: <span class="nm">4</span> }
+  ]
+}</code></pre>
+  </section>
+
+  <!-- ══ SERVICIOS ══ -->
+  <section id="servicios">
+    <h2><span class="icon">⚙️</span> Servicios clave</h2>
+
+    <h3>ZoneService — Distribución snake</h3>
+    <p>Las zonas se generan distribuyendo las parejas (ordenadas por puntos DESC) en un patrón de serpiente. Zonas de 3 parejas como base; las primeras pueden ser de 4 si el total no divide exactamente.</p>
+    <pre><code><span class="cm">// 14 inscriptos → Zona A(4) + Zona B(4) + Zona C(3) + Zona D(3)</span>
+<span class="cm">// Ranking por puntos: 1ª...14ª</span>
+
+Zona A: <span class="nm">1ª</span>, <span class="nm">8ª</span>, <span class="nm">9ª</span>... <span class="cm">(↓ snake)</span>
+Zona B: <span class="nm">2ª</span>, <span class="nm">7ª</span>, <span class="nm">10ª</span>... <span class="cm">(↑ snake)</span>
+Zona C: <span class="nm">3ª</span>, <span class="nm">6ª</span>, <span class="nm">11ª</span>... <span class="cm">(↓ snake)</span>
+Zona D: <span class="nm">4ª</span>, <span class="nm">5ª</span>...      <span class="cm">(↑ snake)</span></code></pre>
+
+    <h3>ZoneService — Swap de parejas</h3>
+    <p>El intercambio usa un patrón <strong>delete → flush → recreate</strong> para evitar la violación del unique constraint <code>(zone_id, position)</code> al hacer UPDATE en la misma transacción.</p>
+    <pre><code><span class="cm">// PATCH /api/tournaments/1/zones/pairs/5/swap</span>
+{ <span class="str">"targetPairId"</span>: <span class="nm">12</span> }
+<span class="cm">// Resultado: pareja 5 queda en zona de pareja 12, y viceversa</span></code></pre>
+
+    <h3>FixtureService — Scheduling automático</h3>
+    <p>Evalúa slots candidatos para cada partido y aplica estos filtros en orden:</p>
+    <div class="tbl-wrap"><table>
+      <tr><th>Filtro</th><th>Aplica a</th></tr>
+      <tr><td>Disponibilidad de la cancha (horario apertura/cierre)</td><td>Todos</td></tr>
+      <tr><td>Días habilitados para zona (<code>zoneDays</code>)</td><td>ZONE</td></tr>
+      <tr><td>Restricciones de pareja (<code>RESTRICTION</code>)</td><td>ZONE</td></tr>
+      <tr><td>Preferencias de pareja (<code>PREFERENCE</code>)</td><td>ZONE</td></tr>
+      <tr><td>Intervalo mínimo entre partidos de la misma pareja</td><td>Todos</td></tr>
+    </table></div>
+    <div class="info orange"><p>Las restricciones y preferencias <strong>no se aplican a partidos de fase eliminatoria</strong>. Solo afectan la fase de zonas (<code>MatchPhase.ZONE</code>).</p></div>
+
+    <h3>EliminationService — Templates oficiales de bracket</h3>
+    <div class="tbl-wrap"><table>
+      <tr><th>Bracket</th><th>Clasificados</th><th>Disputados R1</th><th>BYEs</th></tr>
+      <tr><td>de 8</td><td>6 (3 zonas × 2)</td><td>2</td><td>4</td></tr>
+      <tr><td>de 8</td><td>8 (4 zonas × 2)</td><td>4</td><td>0</td></tr>
+      <tr><td>de 16</td><td>10 (5 zonas × 2)</td><td>2</td><td>6</td></tr>
+      <tr><td>de 16</td><td>12 (6 zonas × 2)</td><td>4</td><td>4</td></tr>
+      <tr><td>de 16</td><td>14 (7 zonas × 2)</td><td>6</td><td>2</td></tr>
+      <tr><td>de 32</td><td>20 (10 zonas × 2)</td><td>4</td><td>12</td></tr>
+    </table></div>
+    <div class="info yellow"><p><strong>Pendiente:</strong> El selector de template debe basarse en el <strong>total de parejas inscriptas</strong>, no en clasificados. Para el caso de 14 inscriptos (4 zonas mixtas) el template difiere del de 15 inscriptos (5 zonas de 3).</p></div>
+  </section>
+
+  <!-- ══ DESEMPATE ══ -->
+  <section id="desempate">
+    <h2><span class="icon">⚖️</span> Reglas de desempate oficiales</h2>
+    <p>Se aplican cuando dos o más parejas tienen el mismo número de victorias dentro de una zona.</p>
+    <div class="tb-grid">
+      <div class="tb-box">
+        <div class="tb-header">Zona de 3 parejas</div>
+        <div class="tb-row"><div class="tb-num">1</div><div class="tb-label">Diferencia de sets</div></div>
+        <div class="tb-row"><div class="tb-num">2</div><div class="tb-label">Diferencia de games</div></div>
+        <div class="tb-row"><div class="tb-num">3</div><div class="tb-label">Games a favor</div></div>
+        <div class="tb-row"><div class="tb-num">4</div><div class="tb-label">Games en contra (menos = mejor)</div></div>
+        <div class="tb-row"><div class="tb-num h2h">5</div><div class="tb-label">Resultado en cancha (H2H)</div></div>
+        <div class="tb-row"><div class="tb-num" style="background:var(--muted);border-color:var(--border);color:var(--fg-muted);">6</div><div class="tb-label" style="color:#555;">Sorteo</div></div>
+      </div>
+      <div class="tb-box">
+        <div class="tb-header">Zona de 4 parejas</div>
+        <div class="tb-row"><div class="tb-num h2h">1</div><div class="tb-label"><strong style="color:var(--blue);">Resultado en cancha (H2H)</strong> — va primero</div></div>
+        <div class="tb-row"><div class="tb-num">2</div><div class="tb-label">Diferencia de sets</div></div>
+        <div class="tb-row"><div class="tb-num">3</div><div class="tb-label">Diferencia de games</div></div>
+        <div class="tb-row"><div class="tb-num">4</div><div class="tb-label">Games a favor</div></div>
+        <div class="tb-row"><div class="tb-num">5</div><div class="tb-label">Games en contra</div></div>
+        <div class="tb-row"><div class="tb-num" style="background:var(--muted);border-color:var(--border);color:var(--fg-muted);">6</div><div class="tb-label" style="color:#555;">Sorteo</div></div>
+      </div>
+    </div>
+    <div class="info green"><p><strong>Implementado en:</strong> <code>MatchResultService.getZoneStandings()</code> (vista) y <code>EliminationService.getZoneOf3Classified()</code> (clasificación real). El H2H usa un mapa <code>"minId-maxId" → winnerId</code> construido al acumular estadísticas.</p></div>
+  </section>
+
+  <!-- ══ FRONTEND ESTRUCTURA ══ -->
+  <section id="fe-estructura">
+    <h2><span class="icon">📁</span> Estructura del frontend</h2>
+    <div class="card">
+      <div class="tree">
+        <div><span class="dir">frontend/src/</span></div>
+        <div>├── <span class="dir">api/</span>                    <span class="cmt"># Funciones Axios por dominio</span></div>
+        <div>│   ├── <span class="file">tournaments.ts</span></div>
+        <div>│   ├── <span class="file">pairs.ts</span>            <span class="cmt"># getZones, generateZones, swapPairs</span></div>
+        <div>│   ├── <span class="file">matches.ts</span>          <span class="cmt"># getZoneStandings, recordResult</span></div>
+        <div>│   ├── <span class="file">players.ts</span></div>
+        <div>│   ├── <span class="file">categories.ts</span></div>
+        <div>│   └── <span class="file">complexes.ts</span></div>
+        <div>├── <span class="dir">components/</span></div>
+        <div>│   ├── <span class="dir">layout/</span><span class="file">Layout.tsx</span>    <span class="cmt"># Shell con sidebar de navegación</span></div>
+        <div>│   └── <span class="dir">ui/</span>                 <span class="cmt"># shadcn/ui components</span></div>
+        <div>├── <span class="dir">pages/</span></div>
+        <div>│   ├── <span class="file">TournamentsPage.tsx</span></div>
+        <div>│   ├── <span class="file">TournamentDetailPage.tsx</span>  <span class="cmt"># Shell con tabs</span></div>
+        <div>│   ├── <span class="file">PlayersPage.tsx</span></div>
+        <div>│   ├── <span class="file">CategoriesPage.tsx</span></div>
+        <div>│   ├── <span class="file">ComplexesPage.tsx</span></div>
+        <div>│   └── <span class="dir">tournament/</span></div>
+        <div>│       ├── <span class="file">PairsTab.tsx</span></div>
+        <div>│       ├── <span class="file">ZonesTab.tsx</span></div>
+        <div>│       ├── <span class="file">FixtureTab.tsx</span></div>
+        <div>│       └── <span class="file">BracketTab.tsx</span></div>
+        <div>├── <span class="file">types/index.ts</span>         <span class="cmt"># Interfaces TypeScript</span></div>
+        <div>└── <span class="dir">lib/</span></div>
+        <div>    ├── <span class="file">axios.ts</span>            <span class="cmt"># Instancia + apiErrorMessage</span></div>
+        <div>    └── <span class="file">utils.ts</span>            <span class="cmt"># cn() helper (clsx + tailwind-merge)</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══ PÁGINAS ══ -->
+  <section id="paginas">
+    <h2><span class="icon">🖥️</span> Páginas de la aplicación</h2>
+
+    <h3>Shell de la aplicación</h3>
+    <div class="mockup">
+      <div class="mockup-bar">
+        <div class="dot r"></div><div class="dot y"></div><div class="dot g"></div>
+        <div class="murl">localhost:5173 — PadelAdmin</div>
+      </div>
+      <div class="app-shell">
+        <div class="app-sb">
+          <div class="app-sb-logo">
+            <div class="ball">🎾</div>
+            <div><div class="name">Padel Admin</div><div class="sub">Panel de gestión</div></div>
+          </div>
+          <div style="padding:8px 6px;">
+            <div class="app-sb-item active">🏆 Torneos</div>
+            <div class="app-sb-item">👤 Jugadores</div>
+            <div class="app-sb-item">📂 Categorías</div>
+            <div class="app-sb-item">🏢 Complejos</div>
+          </div>
+          <div style="margin-top:auto;padding:12px 14px;font-size:10px;color:var(--fg-muted);border-top:1px solid var(--border);">v1.0.0</div>
+        </div>
+        <div class="app-content">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+            <div style="font-size:16px;font-weight:700;color:var(--fg);">Torneos</div>
+            <div style="background:var(--primary);color:#fff;padding:7px 14px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;">+ Nuevo torneo</div>
+          </div>
+          <div class="t-card">
+            <div><div class="t-name">Torneo Apertura 2025</div><div class="t-sub">4ª · Complejo Norte · 01/03 → 30/04/2025</div></div>
+            <span class="tbadge active">Activo</span>
+          </div>
+          <div class="t-card">
+            <div><div class="t-name">Copa Invierno 2024</div><div class="t-sub">3ª · Complejo Sur · 01/06 → 31/08/2024</div></div>
+            <span class="tbadge done">Finalizado</span>
+          </div>
+          <div class="t-card">
+            <div><div class="t-name">Torneo Otoño 2025</div><div class="t-sub">5ª · Complejo Este · 01/05 → 30/06/2025</div></div>
+            <span class="tbadge draft">Borrador</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <h3>Detalle del torneo — Tabs</h3>
+    <div class="mockup">
+      <div class="mockup-bar">
+        <div class="dot r"></div><div class="dot y"></div><div class="dot g"></div>
+        <div class="murl">localhost:5173/tournaments/1/zones</div>
+      </div>
+      <div class="mockup-body">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+          <div>
+            <div style="display:flex;align-items:center;gap:9px;">
+              <span style="font-size:17px;font-weight:700;color:var(--fg);">Torneo Apertura 2025</span>
+              <span class="tbadge active">Activo</span>
+            </div>
+            <div style="font-size:11px;color:var(--fg-muted);margin-top:3px;">4ª · Complejo Norte · 01/03 → 30/04/2025</div>
+          </div>
+          <div style="border:1px solid var(--border);border-radius:8px;padding:6px 12px;font-size:11.5px;color:var(--fg-muted);cursor:pointer;">✓ Marcar finalizado</div>
+        </div>
+        <div class="tabs-bar">
+          <div class="tab">Parejas</div>
+          <div class="tab active">Zonas</div>
+          <div class="tab">Fixture</div>
+          <div class="tab">Bracket</div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+          <div class="zone-card">
+            <div class="zone-header"><span class="zone-name">Zona A</span><span class="zone-tag">4 parejas</span></div>
+            <div class="zone-body">
+              <div class="zone-pair"><span>García R / López M</span><span class="zone-pts">850 pts</span></div>
+              <div class="zone-pair"><span>Martínez P / Ruiz S</span><span class="zone-pts">720 pts</span></div>
+              <div class="zone-pair"><span>Fernández C / Gómez A</span><span class="zone-pts">650 pts</span></div>
+              <div class="zone-pair"><span>Torres J / Díaz L</span><span class="zone-pts">580 pts</span></div>
+            </div>
+          </div>
+          <div class="zone-card">
+            <div class="zone-header"><span class="zone-name">Zona B</span><span class="zone-tag">3 parejas</span></div>
+            <div class="zone-body">
+              <div class="zone-pair"><span>Sánchez E / Moreno B</span><span class="zone-pts">810 pts</span></div>
+              <div class="zone-pair"><span>Jiménez F / Álvarez N</span><span class="zone-pts">700 pts</span></div>
+              <div class="zone-pair"><span>Romero V / Navarro T</span><span class="zone-pts">620 pts</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <h3>Fixture — Resultados visibles</h3>
+    <div class="mockup">
+      <div class="mockup-bar">
+        <div class="dot r"></div><div class="dot y"></div><div class="dot g"></div>
+        <div class="murl">localhost:5173/tournaments/1/fixture</div>
+      </div>
+      <div class="mockup-body">
+        <div style="font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--fg-muted);margin-bottom:8px;">Zona A</div>
+        <!-- Played -->
+        <div class="match-card">
+          <div class="match-row">
+            <div style="flex:1;">
+              <div class="match-name winner">García R / López M</div>
+              <div class="match-name loser">Torres J / Díaz L</div>
+            </div>
+            <div class="match-scores">
+              <div class="score-col"><span class="score-num w">6</span><span class="score-num l">3</span></div>
+              <div class="score-col"><span class="score-num w">6</span><span class="score-num l">4</span></div>
+              <div style="display:flex;flex-direction:column;gap:3px;align-items:center;width:16px;">
+                <span class="check">✓</span><span></span>
+              </div>
+            </div>
+          </div>
+          <div class="match-meta">Cancha 1 · Lun 10/03 10:00 <span class="mbadge played">Jugado</span></div>
+        </div>
+        <!-- Scheduled -->
+        <div class="match-card">
+          <div class="match-row">
+            <div style="flex:1;">
+              <div class="match-name" style="color:var(--fg-muted);">Martínez P / Ruiz S</div>
+              <div style="font-size:10px;color:var(--border);margin:2px 0;">vs</div>
+              <div class="match-name" style="color:var(--fg-muted);">Fernández C / Gómez A</div>
+            </div>
+            <div style="margin-left:auto;">
+              <div style="border:1px solid var(--border);border-radius:6px;padding:5px 11px;font-size:11px;color:var(--fg-muted);cursor:pointer;">Cargar resultado</div>
+            </div>
+          </div>
+          <div class="match-meta">Cancha 2 · Mié 12/03 16:00 <span class="mbadge sched">Programado</span></div>
+        </div>
+        <div style="font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--fg-muted);margin:16px 0 8px;">Zona B</div>
+        <div class="match-card">
+          <div class="match-row">
+            <div style="flex:1;">
+              <div class="match-name" style="color:var(--fg-muted);">Sánchez E / Moreno B</div>
+              <div style="font-size:10px;color:var(--border);margin:2px 0;">vs</div>
+              <div class="match-name" style="color:var(--fg-muted);">Jiménez F / Álvarez N</div>
+            </div>
+            <div style="margin-left:auto;">
+              <div style="border:1px solid var(--border);border-radius:6px;padding:5px 11px;font-size:11px;color:var(--fg-muted);cursor:pointer;">Cargar resultado</div>
+            </div>
+          </div>
+          <div class="match-meta">Cancha 1 · Vie 14/03 18:00 <span class="mbadge pend">Pendiente</span></div>
+        </div>
+      </div>
+    </div>
+
+    <h3>Bracket Eliminatorio</h3>
+    <div class="mockup">
+      <div class="mockup-bar">
+        <div class="dot r"></div><div class="dot y"></div><div class="dot g"></div>
+        <div class="murl">localhost:5173/tournaments/1/bracket</div>
+      </div>
+      <div class="mockup-body">
+        <div class="bracket-grid">
+          <div>
+            <div class="round-label">Cuartos de Final</div>
+            <div class="b-match">
+              <div class="b-pair winner">García R / López M</div>
+              <div class="b-pair bye">— BYE —</div>
+            </div>
+            <div class="b-match">
+              <div class="b-pair">Martínez P / Ruiz S</div>
+              <div class="b-pair">Sánchez E / Moreno B</div>
+            </div>
+            <div class="b-match">
+              <div class="b-pair winner">Jiménez F / Álvarez N</div>
+              <div class="b-pair bye">— BYE —</div>
+            </div>
+            <div class="b-match">
+              <div class="b-pair">Romero V / Navarro T</div>
+              <div class="b-pair">Torres J / Díaz L</div>
+            </div>
+          </div>
+          <div>
+            <div class="round-label">Semifinales</div>
+            <div class="b-match">
+              <div class="b-pair winner">García R / López M</div>
+              <div class="b-pair tbd">Por definir</div>
+            </div>
+            <div class="b-match">
+              <div class="b-pair winner">Jiménez F / Álvarez N</div>
+              <div class="b-pair tbd">Por definir</div>
+            </div>
+          </div>
+          <div>
+            <div class="round-label">Final</div>
+            <div class="b-match">
+              <div class="b-pair tbd">Por definir</div>
+              <div class="b-pair tbd">Por definir</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══ COMPONENTES ══ -->
+  <section id="componentes">
+    <h2><span class="icon">🧩</span> Componentes principales</h2>
+    <div class="tbl-wrap"><table>
+      <tr><th>Componente</th><th>Archivo</th><th>Descripción</th></tr>
+      <tr><td><code>Layout</code></td><td><code>layout/Layout.tsx</code></td><td>Shell con sidebar de navegación global</td></tr>
+      <tr><td><code>PairsTab</code></td><td><code>tournament/PairsTab.tsx</code></td><td>Gestión de parejas, restricciones horarias y puntos</td></tr>
+      <tr><td><code>ZonesTab</code></td><td><code>tournament/ZonesTab.tsx</code></td><td>Zonas expandibles, swap de parejas, standings</td></tr>
+      <tr><td><code>StandingsTable</code></td><td>dentro de ZonesTab</td><td>Posiciones por zona con clasificados marcados</td></tr>
+      <tr><td><code>PairRow</code></td><td>dentro de ZonesTab</td><td>Fila de pareja con selector de intercambio entre zonas</td></tr>
+      <tr><td><code>FixtureTab</code></td><td><code>tournament/FixtureTab.tsx</code></td><td>Partidos agrupados por zona, carga de resultados con scores</td></tr>
+      <tr><td><code>BracketTab</code></td><td><code>tournament/BracketTab.tsx</code></td><td>Bracket por rondas con BYEs y avance automático</td></tr>
+      <tr><td><code>PlayerCombobox</code></td><td><code>ui/player-combobox.tsx</code></td><td>Combobox con búsqueda de jugadores para inscripción</td></tr>
+    </table></div>
+
+    <h3>React Query — Query Keys</h3>
+    <div class="tbl-wrap"><table>
+      <tr><th>Query Key</th><th>Datos</th><th>Se invalida cuando</th></tr>
+      <tr><td><code>['tournaments']</code></td><td>Lista de torneos</td><td>Crear / editar / cambiar estado</td></tr>
+      <tr><td><code>['tournament', id]</code></td><td>Torneo individual</td><td>Editar / finalizar</td></tr>
+      <tr><td><code>['zones', tId]</code></td><td>Zonas con parejas</td><td>Generar zonas / swap / cargar resultado</td></tr>
+      <tr><td><code>['standings', zoneId]</code></td><td>Posiciones de zona</td><td>Cargar resultado / swap de pareja</td></tr>
+      <tr><td><code>['fixture', tId]</code></td><td>Fixture completo</td><td>Generar / schedule-pending / resultado</td></tr>
+      <tr><td><code>['bracket', tId]</code></td><td>Bracket eliminatorio</td><td>Generar bracket / resultado eliminatoria</td></tr>
+    </table></div>
+  </section>
+
+  <!-- ══ FUNCIONALIDADES ══ -->
+  <section id="f-torneos">
+    <h2><span class="icon">🏆</span> Torneos</h2>
+    <div class="tbl-wrap"><table>
+      <tr><th>Campo</th><th>Tipo</th><th>Descripción</th></tr>
+      <tr><td>name</td><td>String</td><td>Nombre del torneo</td></tr>
+      <tr><td>startDate / endDate</td><td>LocalDate</td><td>Rango del torneo</td></tr>
+      <tr><td>categoryId</td><td>Long</td><td>Categoría (1ª, 2ª, 3ª…)</td></tr>
+      <tr><td>complexId</td><td>Long</td><td>Complejo con canchas y horarios</td></tr>
+      <tr><td>matchDurationMinutes</td><td>int</td><td>Duración de cada partido (default: 60 min)</td></tr>
+      <tr><td>minIntervalMinutes</td><td>int</td><td>Descanso mínimo para la misma pareja (default: 180 min)</td></tr>
+      <tr><td>zoneDays</td><td>List&lt;Integer&gt;</td><td>Días habilitados para zona (1=Lun…7=Dom)</td></tr>
+    </table></div>
+  </section>
+
+  <section id="f-parejas">
+    <h2><span class="icon">👥</span> Parejas y Restricciones</h2>
+    <div class="mockup">
+      <div class="mockup-bar">
+        <div class="dot r"></div><div class="dot y"></div><div class="dot g"></div>
+        <div class="murl">localhost:5173/tournaments/1/pairs</div>
+      </div>
+      <div class="mockup-body">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+          <div style="font-size:14px;font-weight:600;color:var(--fg);">14 parejas inscriptas</div>
+          <div style="background:var(--primary);color:#fff;padding:6px 14px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;">+ Inscribir pareja</div>
+        </div>
+        <div class="pair-row"><div><div class="pair-name">García Roberto / López María</div><div class="pair-sub">4ª · 1 restricción</div></div><span class="pair-pts">850 pts</span></div>
+        <div class="pair-row"><div><div class="pair-name">Martínez Pablo / Ruiz Sandra</div><div class="pair-sub">4ª · Sin restricciones</div></div><span class="pair-pts">720 pts</span></div>
+        <div class="pair-row"><div><div class="pair-name">Sánchez Emilio / Moreno Beatriz</div><div class="pair-sub">4ª · 2 restricciones</div></div><span class="pair-pts">810 pts</span></div>
+      </div>
+    </div>
+    <div class="tbl-wrap"><table>
+      <tr><th>Tipo</th><th>Efecto en scheduling</th></tr>
+      <tr><td><code>RESTRICTION</code></td><td>Slot bloqueado — la pareja nunca jugará en ese horario</td></tr>
+      <tr><td><code>PREFERENCE</code></td><td>Slot preferido — el sistema intenta asignarlo primero; si no es posible, usa otros</td></tr>
+    </table></div>
+    <div class="info orange"><p>Las restricciones y preferencias <strong>solo aplican a partidos de zona</strong>. Los partidos eliminatorios no las consideran.</p></div>
+  </section>
+
+  <section id="f-zonas">
+    <h2><span class="icon">🟧</span> Zonas</h2>
+    <h3>Generación automática</h3>
+    <ul>
+      <li>Mínimo <strong>9 parejas</strong> para generar zonas</li>
+      <li>Base de <strong>3 parejas por zona</strong></li>
+      <li>Las primeras zonas pueden ser de <strong>4 parejas</strong> si el total no divide por 3</li>
+      <li>Distribución <strong>snake por puntos</strong> (parejas fuertes separadas)</li>
+    </ul>
+    <h3>Intercambio entre zonas</h3>
+    <p>El swap usa <strong>delete → flush → recreate</strong> en una transacción para evitar la violación del unique constraint <code>(zone_id, position)</code>. Condición: ninguna de las dos parejas puede tener partidos jugados.</p>
+    <h3>Tabla de posiciones</h3>
+    <p>Visible dentro de cada zona expandida. Se actualiza automáticamente al cargar resultados. La columna "Clasif." con ✓ aparece solo cuando la zona completó todos sus partidos.</p>
+  </section>
+
+  <section id="f-fixture">
+    <h2><span class="icon">📅</span> Fixture</h2>
+    <h3>Zona de 3 parejas — Round Robin</h3>
+    <p>Cada pareja juega contra las otras dos. Total: 3 partidos por zona, todos en ronda 1.</p>
+    <h3>Zona de 4 parejas — Sistema de 2 rondas</h3>
+    <ol>
+      <li><strong>Ronda 1:</strong> 2 partidos (par A vs par B, par C vs par D)</li>
+      <li><strong>Ronda 2:</strong> se crea automáticamente al completar ronda 1
+        <ul>
+          <li>Partido de ganadores (G-A/B vs G-C/D)</li>
+          <li>Partido de perdedores (P-A/B vs P-C/D)</li>
+        </ul>
+      </li>
+    </ol>
+    <div class="tbl-wrap"><table>
+      <tr><th>Posición</th><th>Criterio</th></tr>
+      <tr><td>🥇 1°</td><td>Ganador del partido de ganadores</td></tr>
+      <tr><td>🥈 2°</td><td>Perdedor del partido de ganadores</td></tr>
+      <tr><td>🥉 3°</td><td>Ganador del partido de perdedores (clasifica al bracket)</td></tr>
+      <tr><td>4°</td><td>Perdedor del partido de perdedores (eliminado)</td></tr>
+    </table></div>
+  </section>
+
+  <section id="f-bracket">
+    <h2><span class="icon">🏅</span> Bracket Eliminatorio</h2>
+    <h3>Ejemplo bracket de 8 (4 zonas de 3 parejas)</h3>
+    <pre><code><span class="cm">// 8 clasificados — todos 1° y 2° de 4 zonas</span>
+
+Slot 1: <span class="nm">1ºA</span>  vs  <span class="fn">2ºC</span>   <span class="cm">→ Cuarto de Final 1</span>
+Slot 2: <span class="fn">2ºB</span>  vs  <span class="nm">1ºD</span>   <span class="cm">→ Cuarto de Final 2</span>
+Slot 3: <span class="nm">1ºC</span>  vs  <span class="fn">2ºA</span>   <span class="cm">→ Cuarto de Final 3</span>
+Slot 4: <span class="fn">2ºD</span>  vs  <span class="nm">1ºB</span>   <span class="cm">→ Cuarto de Final 4</span>
+
+<span class="cm">// 1ºA y 1ºB siempre en mitades opuestas del draw</span></code></pre>
+
+    <h3>Avance automático de ganadores</h3>
+    <pre><code>nextRound = currentRound / <span class="nm">2</span>
+nextSlot  = (currentSlot + <span class="nm">1</span>) / <span class="nm">2</span>
+isPair1   = currentSlot % <span class="nm">2</span> == <span class="nm">1</span>  <span class="cm">// slot impar → ocupa pair1 del siguiente</span></code></pre>
+
+    <h3>Estados de los partidos</h3>
+    <div class="tbl-wrap"><table>
+      <tr><th>Estado</th><th>Descripción</th></tr>
+      <tr><td><code>PENDING</code></td><td>Ambas parejas definidas, sin programar</td></tr>
+      <tr><td><code>SCHEDULED</code></td><td>Asignado a cancha y horario</td></tr>
+      <tr><td><code>CONFIRMED</code></td><td>Confirmado</td></tr>
+      <tr><td><code>PLAYED</code></td><td>Resultado cargado</td></tr>
+      <tr><td><code>CANCELLED</code></td><td>Cancelado</td></tr>
+    </table></div>
+  </section>
+
+  <!-- Footer -->
+  <div style="border-top:1px solid var(--border);margin-top:60px;padding-top:24px;text-align:center;color:var(--fg-muted);font-size:12px;">
+    <div style="color:var(--primary);font-weight:700;font-size:14px;margin-bottom:4px;">🎾 PadelAdmin</div>
+    Desarrollado por <strong style="color:var(--fg);">CODE SOLUTIONS.ar</strong> · Documentación 2025
+  </div>
+
+</main>
+</div>
+
+<script>
+  const sections = document.querySelectorAll('section[id]');
+  const navLinks  = document.querySelectorAll('.nav-link');
+  const observer  = new IntersectionObserver(entries => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        navLinks.forEach(l => l.classList.remove('active'));
+        const a = document.querySelector(`.nav-link[href="#${e.target.id}"]`);
+        if (a) a.classList.add('active');
+      }
+    });
+  }, { rootMargin: '0px 0px -60% 0px', threshold: 0 });
+  sections.forEach(s => observer.observe(s));
+</script>
+</body>
+</html>
