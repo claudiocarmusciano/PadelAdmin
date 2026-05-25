@@ -10,5 +10,7 @@ public class PairPlayerResponseDto {
     private String firstName;
     private String lastName;
     private String phone;
-    private Integer points; // puntos del jugador en la categoría del torneo
+    private Long categoryId;       // categoría elegida para sus puntos
+    private String categoryName;   // nombre de esa categoría
+    private Double points;         // puntos en esa categoría
 }

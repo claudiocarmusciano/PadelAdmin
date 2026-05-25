@@ -10,11 +10,13 @@ import com.padeladmin.padeladmin.exception.BusinessException;
 import com.padeladmin.padeladmin.exception.ResourceNotFoundException;
 import com.padeladmin.padeladmin.repository.CategoryRepository;
 import com.padeladmin.padeladmin.repository.ComplexRepository;
+import com.padeladmin.padeladmin.repository.MatchRepository;
 import com.padeladmin.padeladmin.repository.TournamentRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.util.List;
 
 @Service
@@ -25,6 +27,7 @@ public class TournamentService {
     private final TournamentRepository tournamentRepository;
     private final CategoryRepository categoryRepository;
     private final ComplexRepository complexRepository;
+    private final MatchRepository matchRepository;
 
     public List<TournamentResponseDto> findAll() {
         return tournamentRepository.findAllByOrderByCreatedAtDesc().stream()
@@ -65,6 +68,7 @@ public class TournamentService {
                 .complex(complex)
                 .matchDurationMinutes(dto.getMatchDurationMinutes())
                 .minIntervalMinutes(dto.getMinIntervalMinutes())
+                .status(TournamentStatus.DRAFT)   // siempre inicia en borrador
                 .build();
 
         return toDto(tournamentRepository.save(tournament));
@@ -104,8 +108,29 @@ public class TournamentService {
     @Transactional
     public TournamentResponseDto updateStatus(Long id, TournamentStatus newStatus) {
         Tournament tournament = getOrThrow(id);
+
+        if (newStatus == TournamentStatus.ACTIVE) {
+            // ACTIVE solo se puede alcanzar automáticamente al generar el fixture
+            throw new BusinessException(
+                    "El torneo se activa automáticamente al generar el fixture una vez llegada la fecha de inicio");
+        }
+        if (newStatus == TournamentStatus.COMPLETED && tournament.getStatus() != TournamentStatus.ACTIVE) {
+            throw new BusinessException("Solo se puede finalizar un torneo que esté Activo");
+        }
+
         tournament.setStatus(newStatus);
         return toDto(tournamentRepository.save(tournament));
+    }
+
+    /** Llamado internamente por FixtureService al generar el fixture. */
+    @Transactional
+    public void activateIfStarted(Long tournamentId) {
+        Tournament tournament = getOrThrow(tournamentId);
+        if (tournament.getStatus() == TournamentStatus.DRAFT
+                && !tournament.getStartDate().isAfter(java.time.LocalDate.now())) {
+            tournament.setStatus(TournamentStatus.ACTIVE);
+            tournamentRepository.save(tournament);
+        }
     }
 
     @Transactional
@@ -135,7 +160,17 @@ public class TournamentService {
                 .matchDurationMinutes(t.getMatchDurationMinutes())
                 .minIntervalMinutes(t.getMinIntervalMinutes())
                 .status(t.getStatus())
+                .fixtureGenerated(matchRepository.existsByTournamentId(t.getId()))
+                .zoneDays(new java.util.ArrayList<>(t.getZoneDays()))
                 .createdAt(t.getCreatedAt())
                 .build();
+    }
+
+    @Transactional
+    public TournamentResponseDto setZoneDays(Long tournamentId, List<Integer> days) {
+        Tournament t = getOrThrow(tournamentId);
+        t.getZoneDays().clear();
+        if (days != null) t.getZoneDays().addAll(days);
+        return toDto(tournamentRepository.save(t));
     }
 }

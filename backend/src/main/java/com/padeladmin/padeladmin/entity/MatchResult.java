@@ -41,6 +41,15 @@ public class MatchResult {
     @JoinColumn(name = "recorded_by")
     private User recordedBy;
 
+    // W.O.: true cuando una pareja no se presentó
+    @Column(name = "walkover", nullable = false, columnDefinition = "boolean not null default false")
+    @Builder.Default
+    private boolean walkover = false;
+
+    // Pareja que dio W.O. (null si no fue W.O.)
+    @Column(name = "walkover_pair_id")
+    private Long walkoverId;
+
     // Detalle de cada set jugado (2 o 3 sets)
     @OneToMany(mappedBy = "matchResult", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("setNumber ASC")

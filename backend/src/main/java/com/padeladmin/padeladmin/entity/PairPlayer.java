@@ -22,4 +22,12 @@ public class PairPlayer {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "player_id", nullable = false)
     private Player player;
+
+    /**
+     * Categoría con la que este jugador aporta sus puntos a la pareja.
+     * Nullable: si es null se usa la categoría del torneo como fallback.
+     */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "category_id")
+    private Category category;
 }

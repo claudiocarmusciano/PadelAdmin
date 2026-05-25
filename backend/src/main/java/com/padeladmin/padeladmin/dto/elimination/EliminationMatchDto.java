@@ -1,11 +1,14 @@
 package com.padeladmin.padeladmin.dto.elimination;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
+import com.padeladmin.padeladmin.dto.fixture.MatchResponseDto;
 import com.padeladmin.padeladmin.dto.fixture.MatchPairDto;
 import com.padeladmin.padeladmin.enums.MatchStatus;
 import lombok.Builder;
 import lombok.Data;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Data
 @Builder
@@ -18,7 +21,12 @@ public class EliminationMatchDto {
     private MatchPairDto pair2;        // null si aún no se conoce el clasificado
     private boolean bye;
     private String courtName;
+    @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss")
     private LocalDateTime scheduledStart;
+    @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss")
     private LocalDateTime scheduledEnd;
     private MatchStatus status;
+    // Resultado (solo si status == PLAYED)
+    private Long winnerPairId;
+    private List<MatchResponseDto.SetScoreDto> sets;
 }

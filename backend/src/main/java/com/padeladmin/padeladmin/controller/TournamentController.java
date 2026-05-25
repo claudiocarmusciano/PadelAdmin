@@ -50,6 +50,12 @@ public class TournamentController {
         return ResponseEntity.ok(tournamentService.updateStatus(id, status));
     }
 
+    @PutMapping("/{id}/zone-days")
+    public ResponseEntity<TournamentResponseDto> setZoneDays(@PathVariable Long id,
+                                                              @RequestBody List<Integer> days) {
+        return ResponseEntity.ok(tournamentService.setZoneDays(id, days));
+    }
+
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> delete(@PathVariable Long id) {
         tournamentService.delete(id);

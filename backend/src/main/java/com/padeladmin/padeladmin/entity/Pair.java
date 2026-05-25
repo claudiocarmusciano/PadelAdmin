@@ -23,10 +23,10 @@ public class Pair {
     @JoinColumn(name = "tournament_id", nullable = false)
     private Tournament tournament;
 
-    // Suma de puntos de ambos jugadores en la categoría del torneo
+    // Suma de puntos de ambos jugadores en la categoría elegida
     @Column(name = "total_points", nullable = false)
     @Builder.Default
-    private Integer totalPoints = 0;
+    private Double totalPoints = 0.0;
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)

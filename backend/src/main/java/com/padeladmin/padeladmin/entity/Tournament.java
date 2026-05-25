@@ -9,6 +9,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.HashSet;
 
 @Entity
 @Table(name = "tournaments")
@@ -59,6 +60,14 @@ public class Tournament {
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
+
+    // Días de semana en que se juegan los partidos de zona (1=Lun … 7=Dom). Vacío = todos los días disponibles.
+    @ElementCollection(fetch = FetchType.EAGER)
+    @CollectionTable(name = "tournament_zone_days",
+            joinColumns = @JoinColumn(name = "tournament_id"))
+    @Column(name = "day_of_week")
+    @Builder.Default
+    private List<Integer> zoneDays = new ArrayList<>();
 
     @OneToMany(mappedBy = "tournament", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default

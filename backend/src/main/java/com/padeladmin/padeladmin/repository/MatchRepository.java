@@ -13,6 +13,8 @@ public interface MatchRepository extends JpaRepository<Match, Long> {
 
     List<Match> findByTournamentIdAndPhase(Long tournamentId, MatchPhase phase);
 
+    boolean existsByTournamentId(Long tournamentId);
+
     List<Match> findByZoneId(Long zoneId);
 
     List<Match> findByZoneIdAndZoneRound(Long zoneId, Integer zoneRound);

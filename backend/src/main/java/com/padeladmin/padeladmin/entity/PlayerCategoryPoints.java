@@ -25,5 +25,5 @@ public class PlayerCategoryPoints {
 
     @Column(nullable = false)
     @Builder.Default
-    private Integer points = 0;
+    private Double points = 0.0;
 }

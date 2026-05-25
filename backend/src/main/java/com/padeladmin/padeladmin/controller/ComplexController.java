@@ -49,6 +49,11 @@ public class ComplexController {
 
     // ── Canchas ───────────────────────────────────────────────────────────────
 
+    @GetMapping("/{complexId}/courts")
+    public ResponseEntity<List<CourtResponseDto>> getCourts(@PathVariable Long complexId) {
+        return ResponseEntity.ok(complexService.getCourts(complexId));
+    }
+
     @PostMapping("/{complexId}/courts")
     public ResponseEntity<CourtResponseDto> addCourt(@PathVariable Long complexId,
                                                      @Valid @RequestBody CourtRequestDto dto) {

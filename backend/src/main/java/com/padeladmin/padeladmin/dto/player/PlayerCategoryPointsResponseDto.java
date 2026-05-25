@@ -11,5 +11,5 @@ public class PlayerCategoryPointsResponseDto {
     private String playerName;
     private Long categoryId;
     private String categoryName;
-    private Integer points;
+    private Double points;
 }

@@ -6,6 +6,7 @@ import lombok.Data;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Data
 @Builder
@@ -21,5 +22,7 @@ public class TournamentResponseDto {
     private Integer matchDurationMinutes;
     private Integer minIntervalMinutes;
     private TournamentStatus status;
+    private boolean fixtureGenerated;   // true si ya se generó el fixture de zona
+    private List<Integer> zoneDays;      // días de semana habilitados (1=Lun … 7=Dom), vacío = todos
     private LocalDateTime createdAt;
 }

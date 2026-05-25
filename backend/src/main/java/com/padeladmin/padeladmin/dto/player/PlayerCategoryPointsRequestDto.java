@@ -12,5 +12,5 @@ public class PlayerCategoryPointsRequestDto {
 
     @NotNull(message = "Los puntos son obligatorios")
     @Min(value = 0, message = "Los puntos no pueden ser negativos")
-    private Integer points;
+    private Double points;
 }

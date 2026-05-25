@@ -1,11 +1,14 @@
 package com.padeladmin.padeladmin.service;
 
 import com.padeladmin.padeladmin.dto.zone.MovePairRequestDto;
+import com.padeladmin.padeladmin.dto.zone.SwapPairsRequestDto;
 import com.padeladmin.padeladmin.dto.zone.ZonePairResponseDto;
 import com.padeladmin.padeladmin.dto.zone.ZoneResponseDto;
 import com.padeladmin.padeladmin.entity.*;
 import com.padeladmin.padeladmin.exception.BusinessException;
 import com.padeladmin.padeladmin.exception.ResourceNotFoundException;
+import com.padeladmin.padeladmin.enums.MatchPhase;
+import com.padeladmin.padeladmin.enums.MatchStatus;
 import com.padeladmin.padeladmin.repository.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -24,8 +27,9 @@ public class ZoneService {
     private final PairRepository pairRepository;
     private final PairPlayerRepository pairPlayerRepository;
     private final TournamentRepository tournamentRepository;
+    private final MatchRepository matchRepository;
 
-    private static final int MIN_PAIRS = 6;
+    private static final int MIN_PAIRS = 9;
 
     // ── Generación automática de zonas ────────────────────────────────────────
 
@@ -42,12 +46,22 @@ public class ZoneService {
                     "Actualmente hay " + N + ".");
         }
 
-        // Eliminar zonas existentes (regeneración)
-        List<Zone> existingZones = zoneRepository.findByTournamentIdOrderByZoneOrder(tournamentId);
-        for (Zone zone : existingZones) {
-            zonePairRepository.deleteByZoneId(zone.getId());
+        // Si ya hay partidos de zona jugados, no se puede regenerar
+        List<Match> existingMatches = matchRepository.findByTournamentIdAndPhase(tournamentId, MatchPhase.ZONE);
+        boolean anyPlayed = existingMatches.stream()
+                .anyMatch(m -> m.getStatus() == MatchStatus.PLAYED);
+        if (anyPlayed) {
+            throw new BusinessException(
+                    "No se pueden regenerar las zonas: ya hay partidos con resultado registrado.");
         }
+        // Eliminar partidos de zona sin resultado (el fixture se deberá regenerar)
+        matchRepository.deleteAll(existingMatches);
+        matchRepository.flush(); // forzar DELETE antes de tocar zonas (FK: matches.zone_id → zones.id)
+
+        // Eliminar zonas existentes — el cascade ALL en Zone.zonePairs borra los ZonePair automáticamente
+        List<Zone> existingZones = zoneRepository.findByTournamentIdOrderByZoneOrder(tournamentId);
         zoneRepository.deleteAll(existingZones);
+        zoneRepository.flush();
 
         // Calcular estructura: minimizar zonas de 4
         // N % 3 == 0 → 0 zonas de 4
@@ -118,6 +132,15 @@ public class ZoneService {
     public List<ZoneResponseDto> movePair(Long tournamentId, Long pairId, MovePairRequestDto dto) {
         getTournamentOrThrow(tournamentId);
 
+        // No se puede mover parejas si ya hay resultados registrados
+        boolean anyPlayed = matchRepository
+                .findByTournamentIdAndPhase(tournamentId, MatchPhase.ZONE)
+                .stream().anyMatch(m -> m.getStatus() == MatchStatus.PLAYED);
+        if (anyPlayed) {
+            throw new BusinessException(
+                    "No se pueden mover parejas: ya hay partidos con resultado registrado.");
+        }
+
         // Buscar la zona actual de la pareja
         ZonePair currentZonePair = zonePairRepository
                 .findByPairIdAndZoneTournamentId(pairId, tournamentId)
@@ -149,6 +172,53 @@ public class ZoneService {
         reorderPositions(sourceZone.getId());
 
         saveZonePair(pair, targetZone, newPosition);
+
+        return findByTournament(tournamentId);
+    }
+
+    // ── Intercambio de parejas entre zonas ───────────────────────────────────
+
+    @Transactional
+    public List<ZoneResponseDto> swapPairs(Long tournamentId, Long pairId, SwapPairsRequestDto dto) {
+        getTournamentOrThrow(tournamentId);
+
+        // No se puede intercambiar si ya hay resultados registrados
+        boolean anyPlayed = matchRepository
+                .findByTournamentIdAndPhase(tournamentId, MatchPhase.ZONE)
+                .stream().anyMatch(m -> m.getStatus() == MatchStatus.PLAYED);
+        if (anyPlayed) {
+            throw new BusinessException(
+                    "No se pueden intercambiar parejas: ya hay partidos con resultado registrado.");
+        }
+
+        ZonePair sourceZP = zonePairRepository
+                .findByPairIdAndZoneTournamentId(pairId, tournamentId)
+                .orElseThrow(() -> new BusinessException("La pareja origen no está asignada a ninguna zona"));
+
+        ZonePair targetZP = zonePairRepository
+                .findByPairIdAndZoneTournamentId(dto.getTargetPairId(), tournamentId)
+                .orElseThrow(() -> new BusinessException("La pareja destino no está asignada a ninguna zona"));
+
+        if (sourceZP.getZone().getId().equals(targetZP.getZone().getId())) {
+            throw new BusinessException("Las parejas ya están en la misma zona");
+        }
+
+        // Capturar datos antes de borrar
+        Zone sourceZone = sourceZP.getZone();
+        Zone targetZone = targetZP.getZone();
+        int sourcePos  = sourceZP.getPosition();
+        int targetPos  = targetZP.getPosition();
+        Pair sourcePair = sourceZP.getPair();
+        Pair targetPair = targetZP.getPair();
+
+        // Borrar ambos y forzar DELETE antes de insertar (evita violación de UniqueConstraint)
+        zonePairRepository.delete(sourceZP);
+        zonePairRepository.delete(targetZP);
+        zonePairRepository.flush();
+
+        // Recrear con zonas intercambiadas (cada pareja toma la posición de la otra)
+        saveZonePair(sourcePair, targetZone, targetPos);
+        saveZonePair(targetPair, sourceZone, sourcePos);
 
         return findByTournament(tournamentId);
     }
@@ -211,8 +281,8 @@ public class ZoneService {
                 })
                 .toList();
 
-        int totalZonePoints = pairDtos.stream()
-                .mapToInt(ZonePairResponseDto::getTotalPoints)
+        double totalZonePoints = pairDtos.stream()
+                .mapToDouble(ZonePairResponseDto::getTotalPoints)
                 .sum();
 
         return ZoneResponseDto.builder()

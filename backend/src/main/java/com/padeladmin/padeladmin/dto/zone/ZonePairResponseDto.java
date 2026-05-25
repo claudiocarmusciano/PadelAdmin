@@ -8,7 +8,7 @@ import lombok.Data;
 public class ZonePairResponseDto {
     private Integer position;
     private Long pairId;
-    private Integer totalPoints;
+    private Double totalPoints;
     private String player1;
     private String player2;
 }

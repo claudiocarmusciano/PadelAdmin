@@ -9,5 +9,5 @@ public class MatchPairDto {
     private Long id;
     private String player1;
     private String player2;
-    private Integer totalPoints;
+    private Double totalPoints;
 }

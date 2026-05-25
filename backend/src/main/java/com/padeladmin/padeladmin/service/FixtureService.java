@@ -28,11 +28,13 @@ import java.util.stream.Collectors;
 @Transactional(readOnly = true)
 public class FixtureService {
 
+    private final TournamentService tournamentService;
     private final TournamentRepository tournamentRepository;
     private final ZoneRepository zoneRepository;
     private final ZonePairRepository zonePairRepository;
     private final PairPlayerRepository pairPlayerRepository;
     private final MatchRepository matchRepository;
+    private final MatchResultRepository matchResultRepository;
     private final CourtRepository courtRepository;
     private final CourtAvailabilityRepository courtAvailabilityRepository;
     private final TournamentBufferRepository bufferRepository;
@@ -102,6 +104,9 @@ public class FixtureService {
         // 8. Persistir
         matchRepository.saveAll(matches);
 
+        // 9. Activar el torneo si la fecha de inicio ya llegó
+        tournamentService.activateIfStarted(tournamentId);
+
         log.info("Fixture generado: {} partidos, {} programados, {} pendientes",
                 matches.size(),
                 matches.stream().filter(m -> m.getStatus() == MatchStatus.SCHEDULED).count(),
@@ -170,19 +175,28 @@ public class FixtureService {
         List<TimeSlot> slots = new ArrayList<>();
         int matchDuration = tournament.getMatchDurationMinutes();
 
+        List<Integer> zoneDays = tournament.getZoneDays(); // 1=Lun … 7=Dom; vacío = sin filtro
+
         LocalDate current = tournament.getStartDate();
         while (!current.isAfter(tournament.getEndDate())) {
-            int dow = current.getDayOfWeek().getValue() - 1; // 0=Lunes, 6=Domingo
+            int dowForCourtAvail = current.getDayOfWeek().getValue() - 1; // 0=Lun … 6=Dom (convención court_availability)
+            int dowForZoneDays   = current.getDayOfWeek().getValue();     // 1=Lun … 7=Dom
+
+            // Si hay días de zona configurados, saltar los días que no correspondan
+            if (!zoneDays.isEmpty() && !zoneDays.contains(dowForZoneDays)) {
+                current = current.plusDays(1);
+                continue;
+            }
 
             for (Court court : courts) {
                 List<CourtAvailability> courtAvailabilities = availabilityByCourtId.get(court.getId());
                 Optional<CourtAvailability> avail = courtAvailabilities.stream()
-                        .filter(a -> a.getDayOfWeek().equals(dow))
+                        .filter(a -> a.getDayOfWeek().equals(dowForCourtAvail))
                         .findFirst();
 
                 if (avail.isPresent()) {
                     List<TimeSlot> daySlots = generateSlotsForDay(
-                            current, avail.get(), buffers, dow, court.getId(), matchDuration);
+                            current, avail.get(), buffers, dowForCourtAvail, court.getId(), matchDuration);
                     slots.addAll(daySlots);
                 }
             }
@@ -301,22 +315,23 @@ public class FixtureService {
         if (violatesMinInterval(pair1Id, slot, scheduled, minInterval)) return false;
         if (pair2Id != null && violatesMinInterval(pair2Id, slot, scheduled, minInterval)) return false;
 
-        // 4. Restricciones horarias (HARD — nunca se violan)
-        List<PairScheduleConstraint> constraints1 = constraintsByPairId.getOrDefault(pair1Id, List.of());
-        List<PairScheduleConstraint> constraints2 = pair2Id != null
-                ? constraintsByPairId.getOrDefault(pair2Id, List.of())
-                : List.of();
+        // 4. Restricciones y preferencias: solo aplican a partidos de zona
+        if (match.getPhase() == MatchPhase.ZONE) {
+            List<PairScheduleConstraint> constraints1 = constraintsByPairId.getOrDefault(pair1Id, List.of());
+            List<PairScheduleConstraint> constraints2 = pair2Id != null
+                    ? constraintsByPairId.getOrDefault(pair2Id, List.of())
+                    : List.of();
 
-        if (violatesRestriction(slot, constraints1)) return false;
-        if (violatesRestriction(slot, constraints2)) return false;
+            if (violatesRestriction(slot, constraints1)) return false;
+            if (violatesRestriction(slot, constraints2)) return false;
 
-        // 5. Preferencias horarias (SOFT — solo en pasada 1)
-        if (enforcePreferences) {
-            boolean pair1HasPrefs = hasPreferences(constraints1);
-            boolean pair2HasPrefs = hasPreferences(constraints2);
+            if (enforcePreferences) {
+                boolean pair1HasPrefs = hasPreferences(constraints1);
+                boolean pair2HasPrefs = hasPreferences(constraints2);
 
-            if (pair1HasPrefs && !satisfiesPreference(slot, constraints1)) return false;
-            if (pair2HasPrefs && !satisfiesPreference(slot, constraints2)) return false;
+                if (pair1HasPrefs && !satisfiesPreference(slot, constraints1)) return false;
+                if (pair2HasPrefs && !satisfiesPreference(slot, constraints2)) return false;
+            }
         }
 
         return true;
@@ -364,7 +379,7 @@ public class FixtureService {
     }
 
     private boolean violatesRestriction(TimeSlot slot, List<PairScheduleConstraint> constraints) {
-        int dow = slot.getDate().getDayOfWeek().getValue() - 1;
+        int dow = slot.getDate().getDayOfWeek().getValue(); // 1=Lun … 7=Dom (igual que el frontend)
         return constraints.stream()
                 .filter(c -> c.getConstraintType() == ConstraintType.RESTRICTION)
                 .filter(c -> c.getDayOfWeek().equals(dow))
@@ -377,7 +392,7 @@ public class FixtureService {
     }
 
     private boolean satisfiesPreference(TimeSlot slot, List<PairScheduleConstraint> constraints) {
-        int dow = slot.getDate().getDayOfWeek().getValue() - 1;
+        int dow = slot.getDate().getDayOfWeek().getValue(); // 1=Lun … 7=Dom (igual que el frontend)
         return constraints.stream()
                 .filter(c -> c.getConstraintType() == ConstraintType.PREFERENCE)
                 .filter(c -> c.getDayOfWeek().equals(dow))
@@ -481,26 +496,68 @@ public class FixtureService {
     }
 
     private MatchResponseDto toMatchDto(Match match) {
-        return MatchResponseDto.builder()
+        MatchResponseDto.MatchResponseDtoBuilder builder = MatchResponseDto.builder()
                 .id(match.getId())
                 .zoneName(match.getZone() != null ? "Zona " + match.getZone().getName() : null)
                 .eliminationRound(match.getEliminationRound())
                 .pair1(match.getPair1() != null ? toPairDto(match.getPair1()) : null)
                 .pair2(match.getPair2() != null ? toPairDto(match.getPair2()) : null)
+                .courtId(match.getCourt() != null ? match.getCourt().getId() : null)
                 .courtName(match.getCourt() != null ? match.getCourt().getName() : null)
+                .complexName(match.getCourt() != null && match.getCourt().getComplex() != null
+                        ? match.getCourt().getComplex().getName() : null)
                 .scheduledStart(match.getScheduledStart())
                 .scheduledEnd(match.getScheduledEnd())
-                .status(match.getStatus())
-                .build();
+                .status(match.getStatus());
+
+        // Incluir resultado si el partido ya fue jugado
+        if (match.getStatus() == MatchStatus.PLAYED) {
+            matchResultRepository.findByMatchId(match.getId()).ifPresent(result -> {
+                builder.winnerPairId(result.getWinnerPair().getId());
+                builder.sets(result.getSets().stream()
+                        .map(s -> MatchResponseDto.SetScoreDto.builder()
+                                .pair1Games(s.getPair1Games())
+                                .pair2Games(s.getPair2Games())
+                                .build())
+                        .toList());
+            });
+        }
+
+        return builder.build();
+    }
+
+    // ── Actualizar cancha de un partido ───────────────────────────────────────
+
+    @Transactional
+    public MatchResponseDto updateMatchCourt(Long matchId, Long courtId) {
+        Match match = matchRepository.findById(matchId)
+                .orElseThrow(() -> new ResourceNotFoundException("Partido", matchId));
+
+        if (courtId == null) {
+            match.setCourt(null);
+            match.setScheduledStart(null);
+            match.setScheduledEnd(null);
+            match.setStatus(MatchStatus.PENDING);
+        } else {
+            Court court = courtRepository.findById(courtId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Cancha", courtId));
+            match.setCourt(court);
+            if (match.getStatus() == MatchStatus.PENDING) {
+                match.setStatus(MatchStatus.SCHEDULED);
+            }
+        }
+        matchRepository.save(match);
+        log.info("Cancha actualizada: Match {} → Court {}", matchId, courtId);
+        return toMatchDto(match);
     }
 
     private MatchPairDto toPairDto(Pair pair) {
         List<PairPlayer> players = pairPlayerRepository.findByPairId(pair.getId());
         String p1 = players.size() > 0
-                ? players.get(0).getPlayer().getLastName() + " / " + players.get(0).getPlayer().getFirstName()
+                ? players.get(0).getPlayer().getLastName() + " " + players.get(0).getPlayer().getFirstName()
                 : "-";
         String p2 = players.size() > 1
-                ? players.get(1).getPlayer().getLastName() + " / " + players.get(1).getPlayer().getFirstName()
+                ? players.get(1).getPlayer().getLastName() + " " + players.get(1).getPlayer().getFirstName()
                 : "-";
         return MatchPairDto.builder()
                 .id(pair.getId())

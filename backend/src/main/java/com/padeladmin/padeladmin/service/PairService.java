@@ -5,6 +5,8 @@ import com.padeladmin.padeladmin.entity.*;
 import com.padeladmin.padeladmin.exception.BusinessException;
 import com.padeladmin.padeladmin.exception.ResourceNotFoundException;
 import com.padeladmin.padeladmin.repository.*;
+import com.padeladmin.padeladmin.repository.CategoryRepository;
+import com.padeladmin.padeladmin.repository.MatchRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -21,7 +23,9 @@ public class PairService {
     private final PairScheduleConstraintRepository constraintRepository;
     private final PlayerRepository playerRepository;
     private final TournamentRepository tournamentRepository;
+    private final CategoryRepository categoryRepository;
     private final PlayerCategoryPointsRepository pointsRepository;
+    private final MatchRepository matchRepository;
 
     private static final String[] DAY_NAMES = {
             "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"
@@ -43,31 +47,37 @@ public class PairService {
     public PairResponseDto create(Long tournamentId, PairRequestDto dto) {
         Tournament tournament = getTournamentOrThrow(tournamentId);
 
-        Long playerId1 = dto.getPlayerIds().get(0);
-        Long playerId2 = dto.getPlayerIds().get(1);
+        PairPlayerEntryDto entry1 = dto.getPlayers().get(0);
+        PairPlayerEntryDto entry2 = dto.getPlayers().get(1);
 
-        if (playerId1.equals(playerId2)) {
+        if (entry1.getPlayerId().equals(entry2.getPlayerId())) {
             throw new BusinessException("Los dos jugadores de la pareja deben ser distintos");
         }
 
-        Player player1 = getPlayerOrThrow(playerId1);
-        Player player2 = getPlayerOrThrow(playerId2);
+        Player player1 = getPlayerOrThrow(entry1.getPlayerId());
+        Player player2 = getPlayerOrThrow(entry2.getPlayerId());
 
         // Validar que ninguno esté ya en una pareja de este torneo
-        if (playerRepository.existsPlayerInTournament(playerId1, tournamentId)) {
+        if (playerRepository.existsPlayerInTournament(entry1.getPlayerId(), tournamentId)) {
             throw new BusinessException(
                     player1.getFirstName() + " " + player1.getLastName()
                     + " ya pertenece a una pareja en este torneo");
         }
-        if (playerRepository.existsPlayerInTournament(playerId2, tournamentId)) {
+        if (playerRepository.existsPlayerInTournament(entry2.getPlayerId(), tournamentId)) {
             throw new BusinessException(
                     player2.getFirstName() + " " + player2.getLastName()
                     + " ya pertenece a una pareja en este torneo");
         }
 
-        // Calcular puntos de cada jugador en la categoría del torneo
-        int points1 = getPlayerPoints(playerId1, tournament.getCategory().getId());
-        int points2 = getPlayerPoints(playerId2, tournament.getCategory().getId());
+        // Resolver categorías elegidas por cada jugador
+        Category cat1 = categoryRepository.findById(entry1.getCategoryId())
+                .orElseThrow(() -> new ResourceNotFoundException("Categoría", entry1.getCategoryId()));
+        Category cat2 = categoryRepository.findById(entry2.getCategoryId())
+                .orElseThrow(() -> new ResourceNotFoundException("Categoría", entry2.getCategoryId()));
+
+        // Calcular puntos de cada jugador en su categoría elegida
+        double points1 = getPlayerPoints(entry1.getPlayerId(), cat1.getId());
+        double points2 = getPlayerPoints(entry2.getPlayerId(), cat2.getId());
 
         Pair pair = Pair.builder()
                 .tournament(tournament)
@@ -75,8 +85,8 @@ public class PairService {
                 .build();
         pair = pairRepository.save(pair);
 
-        pairPlayerRepository.save(PairPlayer.builder().pair(pair).player(player1).build());
-        pairPlayerRepository.save(PairPlayer.builder().pair(pair).player(player2).build());
+        pairPlayerRepository.save(PairPlayer.builder().pair(pair).player(player1).category(cat1).build());
+        pairPlayerRepository.save(PairPlayer.builder().pair(pair).player(player2).category(cat2).build());
 
         return toDto(pair);
     }
@@ -94,6 +104,10 @@ public class PairService {
                                                            PairScheduleConstraintRequestDto dto) {
         Pair pair = getPairOrThrow(tournamentId, pairId);
 
+        if (matchRepository.existsByTournamentId(tournamentId)) {
+            throw new BusinessException(
+                    "No se pueden agregar restricciones: el fixture ya fue generado");
+        }
         if (dto.getSlotEnd().isBefore(dto.getSlotStart()) || dto.getSlotEnd().equals(dto.getSlotStart())) {
             throw new BusinessException("La hora de fin debe ser posterior a la hora de inicio");
         }
@@ -112,6 +126,10 @@ public class PairService {
     @Transactional
     public void removeConstraint(Long tournamentId, Long pairId, Long constraintId) {
         getPairOrThrow(tournamentId, pairId);
+        if (matchRepository.existsByTournamentId(tournamentId)) {
+            throw new BusinessException(
+                    "No se pueden eliminar restricciones: el fixture ya fue generado");
+        }
         PairScheduleConstraint constraint = constraintRepository.findById(constraintId)
                 .orElseThrow(() -> new ResourceNotFoundException("Restricción", constraintId));
         if (!constraint.getPair().getId().equals(pairId)) {
@@ -122,10 +140,10 @@ public class PairService {
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 
-    private int getPlayerPoints(Long playerId, Long categoryId) {
+    private double getPlayerPoints(Long playerId, Long categoryId) {
         return pointsRepository.findByPlayerIdAndCategoryId(playerId, categoryId)
                 .map(PlayerCategoryPoints::getPoints)
-                .orElse(0);
+                .orElse(0.0);
     }
 
     private Tournament getTournamentOrThrow(Long id) {
@@ -148,17 +166,23 @@ public class PairService {
     }
 
     private PairResponseDto toDto(Pair pair) {
-        Long categoryId = pair.getTournament().getCategory().getId();
+        Long defaultCategoryId = pair.getTournament().getCategory().getId();
 
         List<PairPlayerResponseDto> players = pairPlayerRepository.findByPairId(pair.getId()).stream()
                 .map(pp -> {
                     Player p = pp.getPlayer();
-                    int pts = getPlayerPoints(p.getId(), categoryId);
+                    // Usa la categoría elegida para el jugador, o la del torneo como fallback
+                    Category effectiveCat = pp.getCategory() != null
+                            ? pp.getCategory()
+                            : pair.getTournament().getCategory();
+                    double pts = getPlayerPoints(p.getId(), effectiveCat.getId());
                     return PairPlayerResponseDto.builder()
                             .id(p.getId())
                             .firstName(p.getFirstName())
                             .lastName(p.getLastName())
                             .phone(p.getPhone())
+                            .categoryId(effectiveCat.getId())
+                            .categoryName(effectiveCat.getName())
                             .points(pts)
                             .build();
                 })
@@ -183,7 +207,7 @@ public class PairService {
                 .id(c.getId())
                 .constraintType(c.getConstraintType())
                 .dayOfWeek(c.getDayOfWeek())
-                .dayName(DAY_NAMES[c.getDayOfWeek()])
+                .dayName(DAY_NAMES[c.getDayOfWeek() - 1])
                 .slotStart(c.getSlotStart())
                 .slotEnd(c.getSlotEnd())
                 .build();

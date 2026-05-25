@@ -1,5 +1,6 @@
 package com.padeladmin.padeladmin.dto.match;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
 import com.padeladmin.padeladmin.dto.fixture.MatchPairDto;
 import lombok.Builder;
 import lombok.Data;
@@ -19,6 +20,7 @@ public class MatchResultResponseDto {
     private Integer pair2Sets;       // sets ganados por pareja 2 (ej: 1)
     private List<SetScoreResponseDto> sets; // detalle por set (ej: 6-1, 6-4)
     private Long winnerPairId;
+    @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss")
     private LocalDateTime recordedAt;
     private boolean round2Created;
 }

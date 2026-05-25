@@ -1,6 +1,7 @@
 package com.padeladmin.padeladmin.controller;
 
 import com.padeladmin.padeladmin.dto.zone.MovePairRequestDto;
+import com.padeladmin.padeladmin.dto.zone.SwapPairsRequestDto;
 import com.padeladmin.padeladmin.dto.zone.ZoneResponseDto;
 import com.padeladmin.padeladmin.service.ZoneService;
 import jakarta.validation.Valid;
@@ -36,11 +37,19 @@ public class ZoneController {
         return ResponseEntity.ok(zoneService.findById(tournamentId, zoneId));
     }
 
-    // Mover una pareja a otra zona (ajuste manual)
+    // Mover una pareja a otra zona (ajuste manual, requiere espacio)
     @PatchMapping("/pairs/{pairId}/move")
     public ResponseEntity<List<ZoneResponseDto>> movePair(@PathVariable Long tournamentId,
                                                           @PathVariable Long pairId,
                                                           @Valid @RequestBody MovePairRequestDto dto) {
         return ResponseEntity.ok(zoneService.movePair(tournamentId, pairId, dto));
+    }
+
+    // Intercambiar dos parejas entre zonas
+    @PatchMapping("/pairs/{pairId}/swap")
+    public ResponseEntity<List<ZoneResponseDto>> swapPairs(@PathVariable Long tournamentId,
+                                                           @PathVariable Long pairId,
+                                                           @Valid @RequestBody SwapPairsRequestDto dto) {
+        return ResponseEntity.ok(zoneService.swapPairs(tournamentId, pairId, dto));
     }
 }

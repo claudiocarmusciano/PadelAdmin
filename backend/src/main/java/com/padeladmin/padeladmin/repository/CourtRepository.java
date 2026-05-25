@@ -7,4 +7,6 @@ import java.util.List;
 
 public interface CourtRepository extends JpaRepository<Court, Long> {
     List<Court> findByComplexIdAndActiveTrue(Long complexId);
+    List<Court> findByComplexIdOrderByNameAsc(Long complexId);
+    boolean existsByComplexIdAndNameIgnoreCase(Long complexId, String name);
 }

@@ -63,9 +63,19 @@ public class ComplexService {
 
     // ── Canchas ───────────────────────────────────────────────────────────────
 
+    public List<CourtResponseDto> getCourts(Long complexId) {
+        getOrThrow(complexId); // valida que el complejo existe
+        return courtRepository.findByComplexIdOrderByNameAsc(complexId).stream()
+                .map(this::toCourtDto)
+                .toList();
+    }
+
     @Transactional
     public CourtResponseDto addCourt(Long complexId, CourtRequestDto dto) {
         Complex complex = getOrThrow(complexId);
+        if (courtRepository.existsByComplexIdAndNameIgnoreCase(complexId, dto.getName())) {
+            throw new BusinessException("Ya existe una cancha con el nombre \"" + dto.getName() + "\" en este complejo");
+        }
         Court court = Court.builder()
                 .complex(complex)
                 .name(dto.getName())

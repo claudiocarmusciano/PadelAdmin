@@ -12,6 +12,6 @@ public class ZoneResponseDto {
     private String name;
     private Integer zoneSize;
     private Integer zoneOrder;
-    private Integer totalZonePoints;
+    private Double totalZonePoints;
     private List<ZonePairResponseDto> pairs;
 }

@@ -47,11 +47,75 @@ public class MatchResultService {
             throw new BusinessException("No se puede cargar resultado de un partido con BYE");
         }
 
-        // Validar y computar ganador de cada set
-        List<SetScoreDto> setScores = dto.getSets();
+        int pair1Sets, pair2Sets;
+        Pair winner;
+        List<SetScoreDto> setScores;
+
+        if (dto.isWalkover()) {
+            // ── Modo W.O. ─────────────────────────────────────────────────────
+            Long walkoverId = dto.getWalkoverId();
+            if (walkoverId == null) {
+                throw new BusinessException("Debe indicar qué pareja dio W.O.");
+            }
+            boolean walkoverId1 = walkoverId.equals(match.getPair1().getId());
+            boolean walkoverId2 = walkoverId.equals(match.getPair2().getId());
+            if (!walkoverId1 && !walkoverId2) {
+                throw new BusinessException("La pareja que dio W.O. no pertenece a este partido");
+            }
+            // Ganador = la pareja que SÍ se presentó
+            winner = walkoverId1 ? match.getPair2() : match.getPair1();
+            // Sets automáticos: ganador 6-0, 6-0
+            pair1Sets = walkoverId1 ? 0 : 2;
+            pair2Sets = walkoverId1 ? 2 : 0;
+            setScores = List.of(
+                    buildSet(walkoverId1 ? 0 : 6, walkoverId1 ? 6 : 0),
+                    buildSet(walkoverId1 ? 0 : 6, walkoverId1 ? 6 : 0)
+            );
+
+            MatchResult result = MatchResult.builder()
+                    .match(match)
+                    .pair1Score(pair1Sets)
+                    .pair2Score(pair2Sets)
+                    .winnerPair(winner)
+                    .walkover(true)
+                    .walkoverId(walkoverId)
+                    .build();
+            matchResultRepository.save(result);
+
+            for (int i = 0; i < setScores.size(); i++) {
+                SetScoreDto s = setScores.get(i);
+                result.getSets().add(MatchSet.builder()
+                        .matchResult(result)
+                        .setNumber(i + 1)
+                        .pair1Games(s.getPair1Games())
+                        .pair2Games(s.getPair2Games())
+                        .build());
+            }
+            matchResultRepository.save(result);
+
+            match.setStatus(MatchStatus.PLAYED);
+            matchRepository.save(match);
+
+            boolean round2Created = false;
+            if (match.getPhase() == MatchPhase.ZONE
+                    && match.getZone() != null
+                    && match.getZone().getZoneSize() == 4
+                    && Integer.valueOf(1).equals(match.getZoneRound())) {
+                round2Created = tryCreateRound2(match.getZone(), match.getTournament());
+            }
+            if (match.getPhase() == MatchPhase.ELIMINATION) {
+                eliminationService.advanceWinner(match, winner);
+            }
+
+            log.info("W.O. registrado: Match {} → Ganador Pareja {} (W.O. Pareja {})", matchId, winner.getId(), walkoverId);
+            return toDto(result, match, round2Created);
+        }
+
+        // ── Resultado normal ───────────────────────────────────────────────────
+        setScores = dto.getSets();
         validateSets(setScores);
 
-        int pair1Sets = 0, pair2Sets = 0;
+        pair1Sets = 0; pair2Sets = 0;
         for (SetScoreDto s : setScores) {
             if (s.getPair1Games() > s.getPair2Games()) pair1Sets++;
             else pair2Sets++;
@@ -63,7 +127,7 @@ public class MatchResultService {
                     "Verificá los resultados de cada set.");
         }
 
-        Pair winner = pair1Sets > pair2Sets ? match.getPair1() : match.getPair2();
+        winner = pair1Sets > pair2Sets ? match.getPair1() : match.getPair2();
 
         // Guardar resultado principal
         MatchResult result = MatchResult.builder()
@@ -111,6 +175,76 @@ public class MatchResultService {
         return toDto(result, match, round2Created);
     }
 
+    // ── Editar resultado ───────────────────────────────────────────────────────
+
+    @Transactional
+    public MatchResultResponseDto updateResult(Long matchId, MatchResultRequestDto dto) {
+        Match match = matchRepository.findById(matchId)
+                .orElseThrow(() -> new ResourceNotFoundException("Partido", matchId));
+
+        if (match.getStatus() != MatchStatus.PLAYED) {
+            throw new BusinessException("El partido no tiene resultado registrado");
+        }
+
+        MatchResult existingResult = matchResultRepository.findByMatchId(matchId)
+                .orElseThrow(() -> new BusinessException("No se encontró el resultado del partido"));
+
+        // Para fase eliminatoria: bloquear edición si el siguiente partido ya fue jugado
+        if (match.getPhase() == MatchPhase.ELIMINATION
+                && match.getEliminationRound() != null
+                && match.getEliminationRound() > 1) {
+            int nextRound = match.getEliminationRound() / 2;
+            int nextSlot  = (match.getBracketSlot() + 1) / 2;
+            matchRepository.findByTournamentIdAndPhaseAndEliminationRoundAndBracketSlot(
+                            match.getTournament().getId(), MatchPhase.ELIMINATION, nextRound, nextSlot)
+                    .ifPresent(nextMatch -> {
+                        if (nextMatch.getStatus() == MatchStatus.PLAYED) {
+                            throw new BusinessException(
+                                    "No se puede editar: el ganador ya jugó el siguiente partido del bracket");
+                        }
+                    });
+        }
+
+        // Deshacer el avance del ganador en bracket eliminatorio
+        if (match.getPhase() == MatchPhase.ELIMINATION) {
+            reverseWinnerAdvancement(match, existingResult.getWinnerPair());
+        }
+
+        // Eliminar resultado viejo (los sets se eliminan por cascade)
+        matchResultRepository.delete(existingResult);
+        matchResultRepository.flush();
+
+        // Revertir estado del partido a pendiente
+        match.setStatus(MatchStatus.PENDING);
+        matchRepository.save(match);
+
+        log.info("Resultado editado: Match {} — resultado anterior eliminado, registrando nuevo", matchId);
+
+        // Registrar el nuevo resultado usando la lógica existente
+        return recordResult(matchId, dto);
+    }
+
+    // Revierte el avance del ganador al siguiente partido del bracket
+    private void reverseWinnerAdvancement(Match match, Pair oldWinner) {
+        if (match.getEliminationRound() == null || match.getEliminationRound() <= 1) return;
+
+        int nextRound = match.getEliminationRound() / 2;
+        int nextSlot  = (match.getBracketSlot() + 1) / 2;
+        boolean isPair1 = match.getBracketSlot() % 2 == 1;
+
+        matchRepository.findByTournamentIdAndPhaseAndEliminationRoundAndBracketSlot(
+                        match.getTournament().getId(), MatchPhase.ELIMINATION, nextRound, nextSlot)
+                .ifPresent(nextMatch -> {
+                    if (nextMatch.getStatus() != MatchStatus.PLAYED) {
+                        if (isPair1) nextMatch.setPair1(null);
+                        else         nextMatch.setPair2(null);
+                        matchRepository.save(nextMatch);
+                        log.info("Revertido avance: viejo ganador Pareja {} removido de ronda {} slot {}",
+                                oldWinner.getId(), nextRound, nextSlot);
+                    }
+                });
+    }
+
     // ── Obtener resultado ──────────────────────────────────────────────────────
 
     public MatchResultResponseDto getResult(Long matchId) {
@@ -143,6 +277,9 @@ public class MatchResultService {
             accMap.put(zp.getPair().getId(), new StandingAccumulator());
         }
 
+        // Mapa cabeza a cabeza: key = "min-max pairId", value = pairId ganador
+        Map<String, Long> h2hMap = new HashMap<>();
+
         for (Match match : allMatches) {
             if (match.getStatus() != MatchStatus.PLAYED) continue;
             MatchResult result = resultByMatchId.get(match.getId());
@@ -151,6 +288,10 @@ public class MatchResultService {
             Long pair1Id = match.getPair1().getId();
             Long pair2Id = match.getPair2().getId();
             Long winnerId = result.getWinnerPair().getId();
+
+            // Cabeza a cabeza
+            String h2hKey = Math.min(pair1Id, pair2Id) + "-" + Math.max(pair1Id, pair2Id);
+            h2hMap.put(h2hKey, winnerId);
 
             StandingAccumulator acc1 = accMap.get(pair1Id);
             StandingAccumulator acc2 = accMap.get(pair2Id);
@@ -174,23 +315,59 @@ public class MatchResultService {
             if (winnerId.equals(pair1Id)) {
                 acc1.wins++;
                 acc2.losses++;
+                if (result.isWalkover() && pair2Id.equals(result.getWalkoverId())) {
+                    acc2.walkovers++;
+                }
             } else {
                 acc2.wins++;
                 acc1.losses++;
+                if (result.isWalkover() && pair1Id.equals(result.getWalkoverId())) {
+                    acc1.walkovers++;
+                }
             }
         }
 
-        // Ordenar: victorias DESC → diferencia de sets DESC → diferencia de games DESC
+        // ── Ordenar según reglas oficiales ────────────────────────────────────
+        // Zona de 3: victorias → dif.sets → dif.games → games+ → games- → H2H → sorteo
+        // Zona de 4: victorias → H2H → dif.sets → dif.games → games+ → games- → sorteo
         int classifyCount = zone.getZoneSize() == 3 ? 2 : 3;
+        boolean isZone4 = zone.getZoneSize() == 4;
         List<ZonePair> sorted = new ArrayList<>(zonePairs);
         sorted.sort((a, b) -> {
             StandingAccumulator accA = accMap.get(a.getPair().getId());
             StandingAccumulator accB = accMap.get(b.getPair().getId());
+
+            // 1. Victorias
             if (!accA.wins.equals(accB.wins)) return accB.wins - accA.wins;
+
+            // Zona 4: resultado en cancha primero
+            if (isZone4) {
+                int h2h = h2hCompare(a.getPair().getId(), b.getPair().getId(), h2hMap);
+                if (h2h != 0) return h2h;
+            }
+
+            // 2. Diferencia de sets
             int setDiffA = accA.setsFor - accA.setsAgainst;
             int setDiffB = accB.setsFor - accB.setsAgainst;
             if (setDiffA != setDiffB) return setDiffB - setDiffA;
-            return (accB.gamesFor - accB.gamesAgainst) - (accA.gamesFor - accA.gamesAgainst);
+
+            // 3. Diferencia de games
+            int gameDiffA = accA.gamesFor - accA.gamesAgainst;
+            int gameDiffB = accB.gamesFor - accB.gamesAgainst;
+            if (gameDiffA != gameDiffB) return gameDiffB - gameDiffA;
+
+            // 4. Games a favor
+            if (!accA.gamesFor.equals(accB.gamesFor)) return accB.gamesFor - accA.gamesFor;
+
+            // 5. Games en contra (menos es mejor)
+            if (!accA.gamesAgainst.equals(accB.gamesAgainst)) return accA.gamesAgainst - accB.gamesAgainst;
+
+            // Zona 3: resultado en cancha al final (antes del sorteo)
+            if (!isZone4) {
+                return h2hCompare(a.getPair().getId(), b.getPair().getId(), h2hMap);
+            }
+
+            return 0; // sorteo (no automatizable)
         });
 
         List<ZoneStandingDto> standings = new ArrayList<>();
@@ -199,19 +376,25 @@ public class MatchResultService {
             StandingAccumulator acc = accMap.get(zp.getPair().getId());
             List<PairPlayer> players = pairPlayerRepository.findByPairId(zp.getPair().getId());
 
+            // Pts. torneo: 2 por victoria, 1 por derrota presente, 0 por W.O.
+            int presentLosses = acc.losses - acc.walkovers;
+            int tournamentPoints = acc.wins * 2 + presentLosses;
+
             standings.add(ZoneStandingDto.builder()
                     .position(i + 1)
                     .pairId(zp.getPair().getId())
                     .player1(players.size() > 0
-                            ? players.get(0).getPlayer().getLastName() + " / " + players.get(0).getPlayer().getFirstName()
+                            ? players.get(0).getPlayer().getLastName() + " " + players.get(0).getPlayer().getFirstName()
                             : "-")
                     .player2(players.size() > 1
-                            ? players.get(1).getPlayer().getLastName() + " / " + players.get(1).getPlayer().getFirstName()
+                            ? players.get(1).getPlayer().getLastName() + " " + players.get(1).getPlayer().getFirstName()
                             : "-")
                     .totalPoints(zp.getPair().getTotalPoints())
+                    .tournamentPoints(tournamentPoints)
                     .played(acc.played)
                     .wins(acc.wins)
                     .losses(acc.losses)
+                    .walkovers(acc.walkovers)
                     .setsFor(acc.setsFor)
                     .setsAgainst(acc.setsAgainst)
                     .setsDiff(acc.setsFor - acc.setsAgainst)
@@ -220,6 +403,15 @@ public class MatchResultService {
         }
 
         return standings;
+    }
+
+    // ── Helper sets ──────────────────────────────────────────────────────────
+
+    private SetScoreDto buildSet(int pair1Games, int pair2Games) {
+        SetScoreDto s = new SetScoreDto();
+        s.setPair1Games(pair1Games);
+        s.setPair2Games(pair2Games);
+        return s;
     }
 
     // ── Validaciones de sets ──────────────────────────────────────────────────
@@ -322,10 +514,10 @@ public class MatchResultService {
     private MatchPairDto toPairDto(Pair pair) {
         List<PairPlayer> players = pairPlayerRepository.findByPairId(pair.getId());
         String p1 = players.size() > 0
-                ? players.get(0).getPlayer().getLastName() + " / " + players.get(0).getPlayer().getFirstName()
+                ? players.get(0).getPlayer().getLastName() + " " + players.get(0).getPlayer().getFirstName()
                 : "-";
         String p2 = players.size() > 1
-                ? players.get(1).getPlayer().getLastName() + " / " + players.get(1).getPlayer().getFirstName()
+                ? players.get(1).getPlayer().getLastName() + " " + players.get(1).getPlayer().getFirstName()
                 : "-";
         return MatchPairDto.builder()
                 .id(pair.getId())
@@ -335,10 +527,23 @@ public class MatchResultService {
                 .build();
     }
 
+    // ── Cabeza a cabeza ───────────────────────────────────────────────────────
+
+    /**
+     * Compara head-to-head entre dos parejas.
+     * Retorna negativo si pairAId ganó (va antes), positivo si pairBId ganó, 0 si sin resultado.
+     */
+    private int h2hCompare(Long pairAId, Long pairBId, Map<String, Long> h2hMap) {
+        String key = Math.min(pairAId, pairBId) + "-" + Math.max(pairAId, pairBId);
+        Long winner = h2hMap.get(key);
+        if (winner == null) return 0;
+        return winner.equals(pairAId) ? -1 : 1;
+    }
+
     // ── Acumulador interno ────────────────────────────────────────────────────
 
     private static class StandingAccumulator {
-        Integer played = 0, wins = 0, losses = 0;
+        Integer played = 0, wins = 0, losses = 0, walkovers = 0;
         Integer setsFor = 0, setsAgainst = 0;
         Integer gamesFor = 0, gamesAgainst = 0;
     }

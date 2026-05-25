@@ -1,10 +1,13 @@
 package com.padeladmin.padeladmin.controller;
 
+import com.padeladmin.padeladmin.dto.fixture.MatchResponseDto;
 import com.padeladmin.padeladmin.dto.match.MatchResultRequestDto;
 import com.padeladmin.padeladmin.dto.match.MatchResultResponseDto;
 import com.padeladmin.padeladmin.dto.match.ZoneStandingDto;
+import com.padeladmin.padeladmin.service.FixtureService;
 import com.padeladmin.padeladmin.service.MatchResultService;
 import jakarta.validation.Valid;
+import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -16,6 +19,7 @@ import java.util.List;
 public class MatchResultController {
 
     private final MatchResultService matchResultService;
+    private final FixtureService fixtureService;
 
     // Registrar resultado de un partido
     @PostMapping("/api/matches/{matchId}/result")
@@ -23,6 +27,14 @@ public class MatchResultController {
             @PathVariable Long matchId,
             @Valid @RequestBody MatchResultRequestDto dto) {
         return ResponseEntity.ok(matchResultService.recordResult(matchId, dto));
+    }
+
+    // Editar resultado de un partido ya jugado
+    @PutMapping("/api/matches/{matchId}/result")
+    public ResponseEntity<MatchResultResponseDto> updateResult(
+            @PathVariable Long matchId,
+            @Valid @RequestBody MatchResultRequestDto dto) {
+        return ResponseEntity.ok(matchResultService.updateResult(matchId, dto));
     }
 
     // Obtener resultado de un partido
@@ -35,5 +47,18 @@ public class MatchResultController {
     @GetMapping("/api/zones/{zoneId}/standings")
     public ResponseEntity<List<ZoneStandingDto>> getStandings(@PathVariable Long zoneId) {
         return ResponseEntity.ok(matchResultService.getZoneStandings(zoneId));
+    }
+
+    // Cambiar cancha asignada a un partido
+    @PatchMapping("/api/matches/{matchId}/court")
+    public ResponseEntity<MatchResponseDto> updateCourt(
+            @PathVariable Long matchId,
+            @RequestBody CourtUpdateDto dto) {
+        return ResponseEntity.ok(fixtureService.updateMatchCourt(matchId, dto.getCourtId()));
+    }
+
+    @Data
+    static class CourtUpdateDto {
+        private Long courtId; // null para quitar la cancha
     }
 }

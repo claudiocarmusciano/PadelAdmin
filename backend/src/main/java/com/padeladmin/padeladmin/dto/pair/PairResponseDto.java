@@ -10,7 +10,7 @@ import java.util.List;
 public class PairResponseDto {
     private Long id;
     private Long tournamentId;
-    private Integer totalPoints;
+    private Double totalPoints;
     private List<PairPlayerResponseDto> players;
     private List<PairScheduleConstraintResponseDto> constraints;
 }
