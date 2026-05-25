@@ -73,28 +73,49 @@ function BracketMatch({
       </div>
 
       {/* Pareja 1 */}
-      <div className={cn(
-        'py-1 px-2 rounded text-xs mb-1',
-        statusColors[match.status] || 'bg-muted',
-        match.status === 'PLAYED' && match.pair1 && match.winnerPairId === match.pair1.id && 'font-semibold',
-      )}>
-        {match.pair1
-          ? `${match.pair1.player1} / ${match.pair1.player2}`
-          : <span className="text-muted-foreground italic">Por definir</span>}
-      </div>
+      {(() => {
+        const isWinner = match.status === 'PLAYED' && match.pair1 && match.winnerPairId === match.pair1.id
+        const isLoser  = match.status === 'PLAYED' && match.pair1 && match.winnerPairId !== match.pair1.id && !isBye
+        return (
+          <div className={cn(
+            'py-1 px-2 rounded text-xs mb-1 flex items-center gap-1.5',
+            isWinner ? 'bg-green-500/20 text-green-400 font-bold'
+              : isLoser ? 'text-muted-foreground/50'
+              : (statusColors[match.status] || 'bg-muted'),
+          )}>
+            {isWinner && <span className="shrink-0">✓</span>}
+            <span className={isLoser ? 'line-through decoration-muted-foreground/30' : ''}>
+              {match.pair1
+                ? `${match.pair1.player1} / ${match.pair1.player2}`
+                : <span className="not-italic text-muted-foreground italic">Por definir</span>}
+            </span>
+          </div>
+        )
+      })()}
 
       {/* Pareja 2 */}
-      <div className={cn(
-        'py-1 px-2 rounded text-xs',
-        isBye ? 'bg-muted/50 text-muted-foreground' : (statusColors[match.status] || 'bg-muted'),
-        match.status === 'PLAYED' && match.pair2 && match.winnerPairId === match.pair2.id && 'font-semibold',
-      )}>
-        {isBye
-          ? <span className="italic">BYE — pasa directo</span>
-          : match.pair2
-            ? `${match.pair2.player1} / ${match.pair2.player2}`
-            : <span className="text-muted-foreground italic">Por definir</span>}
-      </div>
+      {(() => {
+        const isWinner = match.status === 'PLAYED' && match.pair2 && match.winnerPairId === match.pair2.id
+        const isLoser  = match.status === 'PLAYED' && match.pair2 && match.winnerPairId !== match.pair2.id
+        return (
+          <div className={cn(
+            'py-1 px-2 rounded text-xs flex items-center gap-1.5',
+            isBye ? 'bg-muted/50 text-muted-foreground italic'
+              : isWinner ? 'bg-green-500/20 text-green-400 font-bold'
+              : isLoser ? 'text-muted-foreground/50'
+              : (statusColors[match.status] || 'bg-muted'),
+          )}>
+            {isWinner && <span className="shrink-0">✓</span>}
+            <span className={isLoser ? 'line-through decoration-muted-foreground/30' : ''}>
+              {isBye
+                ? 'BYE — pasa directo'
+                : match.pair2
+                  ? `${match.pair2.player1} / ${match.pair2.player2}`
+                  : <span className="not-italic text-muted-foreground italic">Por definir</span>}
+            </span>
+          </div>
+        )
+      })()}
 
       {/* Marcador */}
       {match.status === 'PLAYED' && match.sets && match.sets.length > 0 && (
