@@ -17,12 +17,14 @@ interface Props {
 }
 
 const statusColors: Record<string, string> = {
-  PENDING: 'bg-muted text-muted-foreground',
+  PENDING:   'bg-muted text-muted-foreground',
   SCHEDULED: 'bg-blue-50 text-blue-700',
   CONFIRMED: 'bg-green-50 text-green-700',
-  PLAYED: 'bg-primary/10 text-primary',
+  PLAYED:    'bg-primary/10 text-primary',
   CANCELLED: 'bg-destructive/10 text-destructive',
 }
+
+// ── Tarjeta de partido en el bracket ─────────────────────────────────────────
 
 function BracketMatch({
   match,
@@ -33,26 +35,26 @@ function BracketMatch({
 }) {
   const isBye = match.bye
   const canLoadResult =
-    !isBye &&
-    match.pair1 &&
-    match.pair2 &&
+    !isBye && match.pair1 && match.pair2 &&
     (match.status === 'PENDING' || match.status === 'SCHEDULED' || match.status === 'CONFIRMED')
   const canEdit = !isBye && match.pair1 && match.pair2 && match.status === 'PLAYED'
 
   return (
     <div
       className={cn(
-        'border rounded-lg p-3 text-sm min-w-[200px]',
+        'border rounded-lg p-3 text-sm w-[220px]',
         isBye && 'opacity-50',
         match.status === 'PLAYED' && 'border-primary/30 bg-primary/5',
-        canLoadResult && 'cursor-pointer hover:border-primary/50 transition-colors'
+        canLoadResult && 'cursor-pointer hover:border-primary/50 transition-colors',
       )}
       onClick={() => canLoadResult && onResult(match)}
       title={canLoadResult ? 'Click para cargar resultado' : undefined}
     >
       <div className="flex items-center gap-1.5 mb-1.5">
         <Badge variant="outline" className="text-xs">{match.roundName}</Badge>
-        {isBye && <span className="text-xs font-medium text-muted-foreground bg-muted px-1.5 py-0.5 rounded">BYE</span>}
+        {isBye && (
+          <span className="text-xs font-medium text-muted-foreground bg-muted px-1.5 py-0.5 rounded">BYE</span>
+        )}
         {match.status === 'PLAYED' && (
           <span className="text-xs text-primary ml-auto flex items-center gap-1.5">
             ✓ Jugado
@@ -70,22 +72,22 @@ function BracketMatch({
         )}
       </div>
 
-      {/* Pair 1 */}
+      {/* Pareja 1 */}
       <div className={cn(
         'py-1 px-2 rounded text-xs mb-1',
         statusColors[match.status] || 'bg-muted',
-        match.status === 'PLAYED' && match.pair1 && match.winnerPairId === match.pair1.id && 'font-semibold'
+        match.status === 'PLAYED' && match.pair1 && match.winnerPairId === match.pair1.id && 'font-semibold',
       )}>
         {match.pair1
           ? `${match.pair1.player1} / ${match.pair1.player2}`
           : <span className="text-muted-foreground italic">Por definir</span>}
       </div>
 
-      {/* Pair 2 — si es BYE muestra etiqueta BYE */}
+      {/* Pareja 2 */}
       <div className={cn(
         'py-1 px-2 rounded text-xs',
         isBye ? 'bg-muted/50 text-muted-foreground' : (statusColors[match.status] || 'bg-muted'),
-        match.status === 'PLAYED' && match.pair2 && match.winnerPairId === match.pair2.id && 'font-semibold'
+        match.status === 'PLAYED' && match.pair2 && match.winnerPairId === match.pair2.id && 'font-semibold',
       )}>
         {isBye
           ? <span className="italic">BYE — pasa directo</span>
@@ -94,7 +96,7 @@ function BracketMatch({
             : <span className="text-muted-foreground italic">Por definir</span>}
       </div>
 
-      {/* Marcador si ya jugó */}
+      {/* Marcador */}
       {match.status === 'PLAYED' && match.sets && match.sets.length > 0 && (
         <div className="mt-1.5 flex gap-1.5">
           {match.sets.map((s, i) => (
@@ -107,7 +109,13 @@ function BracketMatch({
 
       {match.scheduledStart && (
         <p className="text-xs text-muted-foreground mt-1.5">
-          {(() => { try { return new Date(match.scheduledStart as string).toLocaleString('es-AR', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) } catch { return '' } })()}
+          {(() => {
+            try {
+              return new Date(match.scheduledStart as string).toLocaleString('es-AR', {
+                weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit',
+              })
+            } catch { return '' }
+          })()}
           {match.courtName && ` · ${match.courtName}`}
         </p>
       )}
@@ -118,6 +126,52 @@ function BracketMatch({
     </div>
   )
 }
+
+// ── Conector SVG entre rondas ─────────────────────────────────────────────────
+//
+// numFeeders: cantidad de partidos en la columna de la izquierda
+// totalH:     altura total compartida por todas las columnas
+//
+// La fórmula garantiza que las líneas conectan exactamente los centros
+// de los partidos ubicados con justify-around:
+//   centro del match i (0-indexed) de N matches = (2i + 1) * totalH / (2*N)
+
+function RoundConnector({ numFeeders, totalH }: { numFeeders: number; totalH: number }) {
+  const W   = 40          // ancho del conector en px
+  const mid = W / 2       // x de la barra vertical central
+  const N   = numFeeders
+
+  const pairs = Math.floor(N / 2)
+
+  return (
+    <svg
+      width={W}
+      height={totalH}
+      className="shrink-0 text-muted-foreground/40"
+      style={{ overflow: 'visible' }}
+    >
+      {Array.from({ length: pairs }, (_, k) => {
+        const topY = (4 * k + 1) * totalH / (2 * N)
+        const botY = (4 * k + 3) * totalH / (2 * N)
+        const midY = (topY + botY) / 2
+        return (
+          <g key={k}>
+            {/* horizontal: feeder superior → barra */}
+            <line x1={0}   y1={topY} x2={mid} y2={topY} stroke="currentColor" strokeWidth={1.5} />
+            {/* horizontal: feeder inferior → barra */}
+            <line x1={0}   y1={botY} x2={mid} y2={botY} stroke="currentColor" strokeWidth={1.5} />
+            {/* vertical: une los dos feeders */}
+            <line x1={mid} y1={topY} x2={mid} y2={botY} stroke="currentColor" strokeWidth={1.5} />
+            {/* horizontal: barra → partido receptor */}
+            <line x1={mid} y1={midY} x2={W}   y2={midY} stroke="currentColor" strokeWidth={1.5} />
+          </g>
+        )
+      })}
+    </svg>
+  )
+}
+
+// ── Tab principal ─────────────────────────────────────────────────────────────
 
 export default function BracketTab({ tournamentId }: Props) {
   const qc = useQueryClient()
@@ -137,9 +191,19 @@ export default function BracketTab({ tournamentId }: Props) {
     onError: (error) => toast.error(apiErrorMessage(error, 'Error al generar el bracket')),
   })
 
+  // Ordenar de mayor eliminationRound (primera ronda) a menor (final)
   const sortedRounds = bracket
     ? Object.entries(bracket.rounds).sort(([a], [b]) => Number(b) - Number(a))
     : []
+
+  // Altura por unidad de bracket: se ajusta para que el bracket no sea demasiado alto
+  const bracketSize = bracket?.bracketSize ?? 8
+  const UNIT_H =
+    bracketSize <= 4  ? 130 :
+    bracketSize <= 8  ? 100 :
+    bracketSize <= 16 ?  76 :
+                         64
+  const totalH = bracketSize * UNIT_H
 
   // Adaptar EliminationMatch → MatchResponse para reusar ResultDialog
   function toMatchResponse(m: EliminationMatch): MatchResponse {
@@ -183,18 +247,51 @@ export default function BracketTab({ tournamentId }: Props) {
         </Card>
       ) : (
         <div className="overflow-x-auto pb-4">
-          <div className="flex gap-8 min-w-fit">
-            {sortedRounds.map(([round, matches]) => (
-              <div key={round} className="flex flex-col gap-4 justify-around">
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide text-center mb-2">
-                  {matches[0]?.roundName ?? `Ronda ${round}`}
-                </p>
-                {matches.map((m) => (
-                  <BracketMatch key={m.id} match={m} onResult={setResultMatch} />
-                ))}
-              </div>
-            ))}
+
+          {/* Encabezados de ronda */}
+          <div className="flex items-end mb-2" style={{ gap: 0 }}>
+            {sortedRounds.flatMap(([round, matches], idx) => {
+              const header = (
+                <div key={`h-${round}`} className="w-[220px] text-center shrink-0">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                    {matches[0]?.roundName ?? `Ronda ${round}`}
+                  </p>
+                </div>
+              )
+              return idx < sortedRounds.length - 1
+                ? [header, <div key={`hs-${round}`} className="w-10 shrink-0" />]
+                : [header]
+            })}
           </div>
+
+          {/* Columnas del bracket con conectores */}
+          <div className="flex items-start">
+            {sortedRounds.flatMap(([round, matches], idx) => {
+              const col = (
+                <div
+                  key={round}
+                  className="flex flex-col justify-around shrink-0 w-[220px]"
+                  style={{ height: totalH }}
+                >
+                  {matches.map((m) => (
+                    <BracketMatch key={m.id} match={m} onResult={setResultMatch} />
+                  ))}
+                </div>
+              )
+              if (idx < sortedRounds.length - 1) {
+                return [
+                  col,
+                  <RoundConnector
+                    key={`c-${round}`}
+                    numFeeders={matches.length}
+                    totalH={totalH}
+                  />,
+                ]
+              }
+              return [col]
+            })}
+          </div>
+
         </div>
       )}
 
