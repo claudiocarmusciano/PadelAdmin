@@ -30,6 +30,11 @@ export const deleteTournament = async (id: number): Promise<void> => {
   await api.delete(`/tournaments/${id}`)
 }
 
+export const setZoneDays = async (tournamentId: number, days: number[]): Promise<Tournament> => {
+  const { data } = await api.put(`/tournaments/${tournamentId}/zone-days`, days)
+  return data
+}
+
 // Fixture
 export const generateFixture = async (tournamentId: number): Promise<FixtureResponse> => {
   const { data } = await api.post(`/tournaments/${tournamentId}/fixture/generate`)

@@ -1,7 +1,11 @@
 import { Routes, Route, NavLink, useParams, Navigate } from 'react-router-dom'
-import { useQuery } from '@tanstack/react-query'
-import { getTournament } from '@/api/tournaments'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { toast } from 'sonner'
+import { CheckCircle } from 'lucide-react'
+import { getTournament, updateTournamentStatus } from '@/api/tournaments'
+import { apiErrorMessage } from '@/lib/axios'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import PairsTab from '@/pages/tournament/PairsTab'
 import ZonesTab from '@/pages/tournament/ZonesTab'
@@ -29,11 +33,28 @@ const tabs = [
 export default function TournamentDetailPage() {
   const { id } = useParams<{ id: string }>()
   const tournamentId = Number(id)
+  const qc = useQueryClient()
 
   const { data: tournament, isLoading } = useQuery({
     queryKey: ['tournament', tournamentId],
     queryFn: () => getTournament(tournamentId),
   })
+
+  const finalizeMut = useMutation({
+    mutationFn: () => updateTournamentStatus(tournamentId, 'COMPLETED'),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['tournament', tournamentId] })
+      qc.invalidateQueries({ queryKey: ['tournaments'] })
+      toast.success('Torneo finalizado')
+    },
+    onError: (error) => toast.error(apiErrorMessage(error, 'Error al finalizar el torneo')),
+  })
+
+  function handleFinalize() {
+    if (confirm('¿Confirmar que el torneo ha finalizado? Esta acción no se puede deshacer.')) {
+      finalizeMut.mutate()
+    }
+  }
 
   if (isLoading) return <p className="text-muted-foreground">Cargando...</p>
   if (!tournament) return <p className="text-destructive">Torneo no encontrado</p>
@@ -53,6 +74,18 @@ export default function TournamentDetailPage() {
             {tournament.categoryName} · {tournament.complexName} · {tournament.startDate} → {tournament.endDate}
           </p>
         </div>
+        {tournament.status === 'ACTIVE' && (
+          <Button
+            variant="outline"
+            size="sm"
+            className="border-muted-foreground/30 text-muted-foreground hover:border-destructive hover:text-destructive"
+            onClick={handleFinalize}
+            disabled={finalizeMut.isPending}
+          >
+            <CheckCircle size={14} className="mr-1.5" />
+            Marcar como finalizado
+          </Button>
+        )}
       </div>
 
       {/* Tabs */}
@@ -78,9 +111,9 @@ export default function TournamentDetailPage() {
       {/* Tab content */}
       <Routes>
         <Route index element={<Navigate to={`/tournaments/${tournamentId}/pairs`} replace />} />
-        <Route path="pairs" element={<PairsTab tournamentId={tournamentId} />} />
+        <Route path="pairs" element={<PairsTab tournamentId={tournamentId} fixtureGenerated={tournament.fixtureGenerated} startDate={tournament.startDate} endDate={tournament.endDate} zoneDays={tournament.zoneDays ?? []} />} />
         <Route path="zones" element={<ZonesTab tournamentId={tournamentId} />} />
-        <Route path="fixture" element={<FixtureTab tournamentId={tournamentId} />} />
+        <Route path="fixture" element={<FixtureTab tournamentId={tournamentId} startDate={tournament.startDate} endDate={tournament.endDate} zoneDays={tournament.zoneDays ?? []} />} />
         <Route path="bracket" element={<BracketTab tournamentId={tournamentId} />} />
       </Routes>
     </div>

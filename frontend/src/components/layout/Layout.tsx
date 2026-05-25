@@ -1,6 +1,7 @@
 import { Outlet, NavLink } from 'react-router-dom'
 import { Trophy, Users, Tag, Building2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import PadelAdminLogo from '@/components/logo/PadelAdminLogo'
 
 const navItems = [
   { to: '/tournaments', label: 'Torneos', icon: Trophy },
@@ -14,9 +15,12 @@ export default function Layout() {
     <div className="flex h-screen bg-background">
       {/* Sidebar */}
       <aside className="w-56 border-r flex flex-col">
-        <div className="p-5 border-b">
-          <h1 className="text-xl font-bold tracking-tight">PadelAdmin</h1>
-          <p className="text-xs text-muted-foreground mt-0.5">Panel de gestión</p>
+        <div className="p-4 border-b flex items-center gap-3">
+          <PadelAdminLogo size={38} className="shrink-0" />
+          <div>
+            <h1 className="text-base font-bold tracking-tight leading-tight">Padel Admin</h1>
+            <p className="text-xs text-muted-foreground">Panel de gestión</p>
+          </div>
         </div>
         <nav className="flex-1 p-3 space-y-1">
           {navItems.map(({ to, label, icon: Icon }) => (

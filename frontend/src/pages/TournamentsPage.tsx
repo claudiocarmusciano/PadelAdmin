@@ -7,6 +7,7 @@ import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 
 import { getTournaments, createTournament, updateTournament, deleteTournament, updateTournamentStatus } from '@/api/tournaments'
+import { apiErrorMessage } from '@/lib/axios'
 import { getCategories } from '@/api/categories'
 import { getComplexes } from '@/api/complexes'
 import type { Tournament, TournamentRequest } from '@/types'
@@ -70,7 +71,7 @@ export default function TournamentsPage() {
       toast.success('Torneo creado')
       handleClose()
     },
-    onError: () => toast.error('Error al crear el torneo'),
+    onError: (error) => toast.error(apiErrorMessage(error, 'Error al crear el torneo')),
   })
 
   const updateMut = useMutation({
@@ -80,7 +81,7 @@ export default function TournamentsPage() {
       toast.success('Torneo actualizado')
       handleClose()
     },
-    onError: () => toast.error('Error al actualizar el torneo'),
+    onError: (error) => toast.error(apiErrorMessage(error, 'Error al actualizar el torneo')),
   })
 
   const deleteMut = useMutation({
@@ -89,7 +90,7 @@ export default function TournamentsPage() {
       qc.invalidateQueries({ queryKey: ['tournaments'] })
       toast.success('Torneo eliminado')
     },
-    onError: () => toast.error('Error al eliminar el torneo'),
+    onError: (error) => toast.error(apiErrorMessage(error, 'Error al eliminar el torneo')),
   })
 
   const statusMut = useMutation({
@@ -98,7 +99,7 @@ export default function TournamentsPage() {
       qc.invalidateQueries({ queryKey: ['tournaments'] })
       toast.success('Estado actualizado')
     },
-    onError: () => toast.error('Error al cambiar el estado'),
+    onError: (error) => toast.error(apiErrorMessage(error, 'Error al cambiar el estado')),
   })
 
   function handleOpen(t?: Tournament) {
@@ -144,9 +145,9 @@ export default function TournamentsPage() {
     }
   }
 
-  function nextStatus(current: string) {
-    if (current === 'DRAFT') return 'ACTIVE'
-    if (current === 'ACTIVE') return 'COMPLETED'
+  // DRAFT → ACTIVE es automático al generar el fixture; solo se expone ACTIVE → COMPLETED
+  function nextStatus(t: Tournament) {
+    if (t.status === 'ACTIVE') return 'COMPLETED'
     return null
   }
 
@@ -180,7 +181,7 @@ export default function TournamentsPage() {
       ) : (
         <div className="grid gap-3">
           {tournaments.map((t) => {
-            const ns = nextStatus(t.status)
+            const ns = nextStatus(t)
             return (
               <Card key={t.id} className="hover:shadow-md transition-shadow">
                 <CardContent className="flex items-center gap-4 py-4">
@@ -200,15 +201,6 @@ export default function TournamentsPage() {
                     </div>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
-                    {ns && (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => statusMut.mutate({ id: t.id, status: ns })}
-                      >
-                        → {statusLabels[ns]}
-                      </Button>
-                    )}
                     <Button size="sm" variant="ghost" onClick={() => navigate(`/tournaments/${t.id}/pairs`)}>
                       <ChevronRight size={16} />
                     </Button>

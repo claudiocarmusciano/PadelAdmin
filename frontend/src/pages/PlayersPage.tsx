@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { Plus, Pencil, Trash2, Search, Users, ChevronDown, ChevronUp } from 'lucide-react'
 import { getPlayers, createPlayer, updatePlayer, deletePlayer, getPlayerPoints, upsertPlayerPoints, deletePlayerPoints } from '@/api/players'
+import { apiErrorMessage } from '@/lib/axios'
 import { getCategories } from '@/api/categories'
 import type { Player, PlayerRequest, PlayerCategoryPoints } from '@/types'
 import { Button } from '@/components/ui/button'
@@ -50,7 +51,7 @@ function PlayerCategoriesSection({ player }: { player: Player }) {
       setSelectedCategoryId('')
       setPoints('')
     },
-    onError: () => toast.error('Error al guardar los puntos'),
+    onError: (error) => toast.error(apiErrorMessage(error, 'Error al guardar los puntos')),
   })
 
   const deleteMut = useMutation({
@@ -59,7 +60,7 @@ function PlayerCategoriesSection({ player }: { player: Player }) {
       qc.invalidateQueries({ queryKey: ['playerPoints', player.id] })
       toast.success('Categoría removida')
     },
-    onError: () => toast.error('Error al eliminar'),
+    onError: (error) => toast.error(apiErrorMessage(error, 'Error al eliminar')),
   })
 
   const assignedCategoryIds = new Set(playerPoints.map((p: PlayerCategoryPoints) => p.categoryId))
@@ -238,7 +239,7 @@ export default function PlayersPage() {
       toast.success('Jugador creado')
       handleClose()
     },
-    onError: () => toast.error('Error al crear el jugador'),
+    onError: (error) => toast.error(apiErrorMessage(error, 'Error al crear el jugador')),
   })
 
   const updateMut = useMutation({
@@ -248,7 +249,7 @@ export default function PlayersPage() {
       toast.success('Jugador actualizado')
       handleClose()
     },
-    onError: () => toast.error('Error al actualizar el jugador'),
+    onError: (error) => toast.error(apiErrorMessage(error, 'Error al actualizar el jugador')),
   })
 
   const deleteMut = useMutation({
@@ -257,7 +258,7 @@ export default function PlayersPage() {
       qc.invalidateQueries({ queryKey: ['players'] })
       toast.success('Jugador eliminado')
     },
-    onError: () => toast.error('Error al eliminar el jugador'),
+    onError: (error) => toast.error(apiErrorMessage(error, 'Error al eliminar el jugador')),
   })
 
   function handleOpen(p?: Player) {

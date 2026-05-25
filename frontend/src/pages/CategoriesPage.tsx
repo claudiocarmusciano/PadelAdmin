@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { Plus, Pencil, Trash2, Tag } from 'lucide-react'
 import { getCategories, createCategory, updateCategory, deleteCategory } from '@/api/categories'
+import { apiErrorMessage } from '@/lib/axios'
 import type { Category } from '@/types'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -32,7 +33,7 @@ export default function CategoriesPage() {
       toast.success('Categoría creada')
       handleClose()
     },
-    onError: () => toast.error('Error al crear la categoría'),
+    onError: (error) => toast.error(apiErrorMessage(error, 'Error al crear la categoría')),
   })
 
   const updateMut = useMutation({
@@ -42,7 +43,7 @@ export default function CategoriesPage() {
       toast.success('Categoría actualizada')
       handleClose()
     },
-    onError: () => toast.error('Error al actualizar la categoría'),
+    onError: (error) => toast.error(apiErrorMessage(error, 'Error al actualizar la categoría')),
   })
 
   const deleteMut = useMutation({
@@ -51,7 +52,7 @@ export default function CategoriesPage() {
       qc.invalidateQueries({ queryKey: ['categories'] })
       toast.success('Categoría eliminada')
     },
-    onError: () => toast.error('Error al eliminar la categoría'),
+    onError: (error) => toast.error(apiErrorMessage(error, 'Error al eliminar la categoría')),
   })
 
   function handleOpen(c?: Category) {

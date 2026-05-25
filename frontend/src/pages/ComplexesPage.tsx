@@ -6,6 +6,7 @@ import {
   getComplexes, createComplex, updateComplex, deleteComplex,
   getCourts, createCourt, updateCourt, deleteCourt,
 } from '@/api/complexes'
+import { apiErrorMessage } from '@/lib/axios'
 import type { Complex, Court } from '@/types'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -34,14 +35,14 @@ function CourtsSection({ complex }: { complex: Complex }) {
       toast.success('Cancha creada')
       setCourtName('')
     },
-    onError: () => toast.error('Error al crear la cancha'),
+    onError: (error) => toast.error(apiErrorMessage(error, 'Error al crear la cancha')),
   })
 
   const toggleMut = useMutation({
     mutationFn: (court: Court) =>
       updateCourt(complex.id, court.id, { name: court.name, active: !court.active }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['courts', complex.id] }),
-    onError: () => toast.error('Error al actualizar la cancha'),
+    onError: (error) => toast.error(apiErrorMessage(error, 'Error al actualizar la cancha')),
   })
 
   const deleteMut = useMutation({
@@ -50,7 +51,7 @@ function CourtsSection({ complex }: { complex: Complex }) {
       qc.invalidateQueries({ queryKey: ['courts', complex.id] })
       toast.success('Cancha eliminada')
     },
-    onError: () => toast.error('Error al eliminar la cancha'),
+    onError: (error) => toast.error(apiErrorMessage(error, 'Error al eliminar la cancha')),
   })
 
   return (
@@ -130,7 +131,7 @@ export default function ComplexesPage() {
       toast.success('Complejo creado')
       handleClose()
     },
-    onError: () => toast.error('Error al crear el complejo'),
+    onError: (error) => toast.error(apiErrorMessage(error, 'Error al crear el complejo')),
   })
 
   const updateMut = useMutation({
@@ -140,7 +141,7 @@ export default function ComplexesPage() {
       toast.success('Complejo actualizado')
       handleClose()
     },
-    onError: () => toast.error('Error al actualizar el complejo'),
+    onError: (error) => toast.error(apiErrorMessage(error, 'Error al actualizar el complejo')),
   })
 
   const deleteMut = useMutation({
@@ -149,7 +150,7 @@ export default function ComplexesPage() {
       qc.invalidateQueries({ queryKey: ['complexes'] })
       toast.success('Complejo eliminado')
     },
-    onError: () => toast.error('Error al eliminar el complejo'),
+    onError: (error) => toast.error(apiErrorMessage(error, 'Error al eliminar el complejo')),
   })
 
   function handleOpen(c?: Complex) {

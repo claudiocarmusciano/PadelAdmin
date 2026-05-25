@@ -14,6 +14,8 @@ export interface Tournament {
   matchDurationMinutes: number
   minIntervalMinutes: number
   status: TournamentStatus
+  fixtureGenerated: boolean
+  zoneDays: number[]          // días habilitados para partidos (1=Lun … 7=Dom), vacío = todos
   createdAt: string
 }
 
@@ -86,6 +88,8 @@ export interface PairPlayer {
   firstName: string
   lastName: string
   phone: string
+  categoryId: number
+  categoryName: string
   points: number
 }
 
@@ -94,10 +98,34 @@ export interface Pair {
   tournamentId: number
   totalPoints: number
   players: PairPlayer[]
+  constraints: PairConstraint[]
+}
+
+export interface PairPlayerEntry {
+  playerId: number
+  categoryId: number
 }
 
 export interface PairRequest {
-  playerIds: number[]
+  players: PairPlayerEntry[]
+}
+
+export type ConstraintType = 'RESTRICTION' | 'PREFERENCE'
+
+export interface PairConstraint {
+  id: number
+  constraintType: ConstraintType
+  dayOfWeek: number   // 1=lunes … 7=domingo
+  dayName: string
+  slotStart: string   // "HH:mm:ss" desde el backend
+  slotEnd: string
+}
+
+export interface PairConstraintRequest {
+  constraintType: ConstraintType
+  dayOfWeek: number
+  slotStart: string   // "HH:mm"
+  slotEnd: string
 }
 
 // ── Zonas ─────────────────────────────────────────────────────────────────────
@@ -130,16 +158,26 @@ export interface MatchPair {
   totalPoints: number
 }
 
+export interface SetScoreDto {
+  pair1Games: number
+  pair2Games: number
+}
+
 export interface MatchResponse {
   id: number
   zoneName?: string
   eliminationRound?: number
   pair1?: MatchPair
   pair2?: MatchPair
+  courtId?: number
   courtName?: string
+  complexName?: string
   scheduledStart?: string
   scheduledEnd?: string
   status: MatchStatus
+  // Solo cuando status === 'PLAYED'
+  winnerPairId?: number
+  sets?: SetScoreDto[]
 }
 
 export interface FixtureResponse {
@@ -166,6 +204,8 @@ export interface SetScoreResponse {
 
 export interface MatchResultRequest {
   sets: SetScore[]
+  walkover?: boolean
+  walkoverId?: number
 }
 
 export interface MatchResultResponse {
@@ -189,14 +229,23 @@ export interface ZoneStanding {
   pairId: number
   player1: string
   player2: string
-  totalPoints: number
+  totalPoints: number        // Puntos de ranking (pre-torneo)
+  tournamentPoints: number   // Puntos ganados en el torneo (2=ganó, 1=perdió presente, 0=W.O.)
   played: number
   wins: number
   losses: number
+  walkovers: number
   setsFor: number
   setsAgainst: number
   setsDiff: number
   classified: boolean
+}
+
+export interface ComplexWithCourts {
+  id: number
+  name: string
+  address: string
+  courts: { id: number; name: string; active: boolean }[]
 }
 
 // ── Bracket eliminatorio ──────────────────────────────────────────────────────
@@ -213,6 +262,8 @@ export interface EliminationMatch {
   scheduledStart?: string
   scheduledEnd?: string
   status: MatchStatus
+  winnerPairId?: number
+  sets?: SetScoreDto[]
 }
 
 export interface EliminationBracket {

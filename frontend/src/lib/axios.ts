@@ -8,3 +8,11 @@ const api = axios.create({
 })
 
 export default api
+
+/** Extrae el mensaje legible del error de la API (campo `message` del cuerpo). */
+export function apiErrorMessage(error: unknown, fallback = 'Error inesperado'): string {
+  if (axios.isAxiosError(error)) {
+    return error.response?.data?.message ?? fallback
+  }
+  return fallback
+}
