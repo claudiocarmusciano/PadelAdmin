@@ -278,16 +278,29 @@ function CourtDialog({
     match.courtId ? String(match.courtId) : ''
   )
 
+  // Pre-rellenar con el horario actual (formato datetime-local: "YYYY-MM-DDTHH:mm")
+  const initialDatetime = match.scheduledStart
+    ? String(match.scheduledStart).slice(0, 16)
+    : ''
+  const [scheduledStart, setScheduledStart] = useState<string>(initialDatetime)
+
   const { data: complexes = [], isLoading } = useQuery<ComplexWithCourts[]>({
     queryKey: ['complexes'],
     queryFn: getComplexesWithCourts,
   })
 
   const updateMut = useMutation({
-    mutationFn: () =>
-      updateMatchCourt(match.id, selectedCourtId ? Number(selectedCourtId) : null),
+    mutationFn: () => {
+      const courtId = selectedCourtId ? Number(selectedCourtId) : null
+      // Solo enviar scheduledStart si cambió respecto al original
+      const newStart = scheduledStart && scheduledStart !== initialDatetime
+        ? scheduledStart + ':00'   // agregar segundos → "YYYY-MM-DDTHH:mm:ss"
+        : null
+      return updateMatchCourt(match.id, courtId, newStart)
+    },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['fixture', tournamentId] })
+      qc.invalidateQueries({ queryKey: ['bracket', tournamentId] })
       toast.success('Cancha actualizada')
       onClose()
     },
@@ -297,39 +310,57 @@ function CourtDialog({
   return (
     <DialogContent className="max-w-sm">
       <DialogHeader>
-        <DialogTitle>Cambiar cancha</DialogTitle>
+        <DialogTitle>Cambiar cancha / horario</DialogTitle>
       </DialogHeader>
-      <div className="py-2 space-y-3">
+      <div className="py-2 space-y-4">
         <p className="text-sm text-muted-foreground">
           {match.pair1 ? `${match.pair1.player1} / ${match.pair1.player2}` : '–'}
           <span className="mx-1">vs</span>
           {match.pair2 ? `${match.pair2.player1} / ${match.pair2.player2}` : '–'}
         </p>
 
+        {/* Selector de cancha */}
         {isLoading ? (
           <p className="text-sm text-muted-foreground">Cargando canchas...</p>
         ) : (
-          <Select value={selectedCourtId} onValueChange={setSelectedCourtId}>
-            <SelectTrigger>
-              <SelectValue placeholder="Sin cancha asignada" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="">Sin cancha</SelectItem>
-              {complexes.map((complex) => (
-                <SelectGroup key={complex.id}>
-                  <SelectLabel>{complex.name}</SelectLabel>
-                  {complex.courts
-                    .filter((c) => c.active)
-                    .map((court) => (
-                      <SelectItem key={court.id} value={String(court.id)}>
-                        {court.name}
-                      </SelectItem>
-                    ))}
-                </SelectGroup>
-              ))}
-            </SelectContent>
-          </Select>
+          <div className="grid gap-1.5">
+            <Label className="text-xs text-muted-foreground">Cancha</Label>
+            <Select value={selectedCourtId} onValueChange={setSelectedCourtId}>
+              <SelectTrigger>
+                <SelectValue placeholder="Sin cancha asignada" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="">Sin cancha</SelectItem>
+                {complexes.map((complex) => (
+                  <SelectGroup key={complex.id}>
+                    <SelectLabel>{complex.name}</SelectLabel>
+                    {complex.courts
+                      .filter((c) => c.active)
+                      .map((court) => (
+                        <SelectItem key={court.id} value={String(court.id)}>
+                          {court.name}
+                        </SelectItem>
+                      ))}
+                  </SelectGroup>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         )}
+
+        {/* Picker de fecha y hora */}
+        <div className="grid gap-1.5">
+          <Label className="text-xs text-muted-foreground">
+            Fecha y hora
+            {initialDatetime && <span className="ml-1 text-muted-foreground/60">(dejar igual para no cambiar)</span>}
+          </Label>
+          <input
+            type="datetime-local"
+            value={scheduledStart}
+            onChange={(e) => setScheduledStart(e.target.value)}
+            className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+          />
+        </div>
       </div>
       <DialogFooter>
         <Button variant="outline" onClick={onClose}>Cancelar</Button>

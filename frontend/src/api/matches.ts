@@ -22,8 +22,12 @@ export const getResult = async (matchId: number): Promise<MatchResultResponse> =
   return data
 }
 
-export const updateMatchCourt = async (matchId: number, courtId: number | null): Promise<MatchResponse> => {
-  const { data } = await api.patch(`/matches/${matchId}/court`, { courtId })
+export const updateMatchCourt = async (
+  matchId: number,
+  courtId: number | null,
+  scheduledStart?: string | null   // ISO datetime string, ej. "2026-06-01T09:00:00"
+): Promise<MatchResponse> => {
+  const { data } = await api.patch(`/matches/${matchId}/court`, { courtId, scheduledStart: scheduledStart ?? null })
   return data
 }
 

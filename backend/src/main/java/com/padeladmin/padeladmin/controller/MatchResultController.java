@@ -12,6 +12,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 @RestController
@@ -49,16 +50,18 @@ public class MatchResultController {
         return ResponseEntity.ok(matchResultService.getZoneStandings(zoneId));
     }
 
-    // Cambiar cancha asignada a un partido
+    // Cambiar cancha (y opcionalmente horario) de un partido
     @PatchMapping("/api/matches/{matchId}/court")
     public ResponseEntity<MatchResponseDto> updateCourt(
             @PathVariable Long matchId,
             @RequestBody CourtUpdateDto dto) {
-        return ResponseEntity.ok(fixtureService.updateMatchCourt(matchId, dto.getCourtId()));
+        return ResponseEntity.ok(
+                fixtureService.updateMatchCourt(matchId, dto.getCourtId(), dto.getScheduledStart()));
     }
 
     @Data
     static class CourtUpdateDto {
-        private Long courtId; // null para quitar la cancha
+        private Long courtId;                 // null para quitar la cancha
+        private LocalDateTime scheduledStart; // null = mantener el horario actual
     }
 }

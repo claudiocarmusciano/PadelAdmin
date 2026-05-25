@@ -19,6 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -93,7 +94,14 @@ public class FixtureService {
 
         // 5. Generar slots válidos
         List<TimeSlot> slots = generateTimeSlots(tournament, courts, availabilityByCourtId, buffers);
-        log.info("Slots disponibles generados: {}", slots.size());
+        // Ordenar por fecha+hora antes que por cancha: así el scheduler ofrece
+        // TODAS las canchas en la misma franja horaria antes de pasar a la siguiente,
+        // logrando que los partidos se distribuyan entre canchas simultáneamente.
+        slots.sort(Comparator
+                .comparing(TimeSlot::getDate)
+                .thenComparing(TimeSlot::getStartTime)
+                .thenComparingLong(TimeSlot::getCourtId));
+        log.info("Slots disponibles generados: {} (para {} canchas)", slots.size(), courts.size());
 
         // 6. Obtener todas las restricciones/preferencias de las parejas involucradas
         Map<Long, List<PairScheduleConstraint>> constraintsByPairId = buildConstraintsMap(matches);
@@ -453,6 +461,10 @@ public class FixtureService {
                 ));
         List<TournamentBuffer> buffers = bufferRepository.findByTournamentIdOrderByDayOfWeek(tournamentId);
         List<TimeSlot> slots = generateTimeSlots(tournament, courts, availabilityByCourtId, buffers);
+        slots.sort(Comparator
+                .comparing(TimeSlot::getDate)
+                .thenComparing(TimeSlot::getStartTime)
+                .thenComparingLong(TimeSlot::getCourtId));
 
         // Los partidos ya programados/jugados cuentan como ocupados
         List<Match> alreadyScheduled = allMatches.stream()
@@ -529,11 +541,12 @@ public class FixtureService {
     // ── Actualizar cancha de un partido ───────────────────────────────────────
 
     @Transactional
-    public MatchResponseDto updateMatchCourt(Long matchId, Long courtId) {
+    public MatchResponseDto updateMatchCourt(Long matchId, Long courtId, LocalDateTime scheduledStart) {
         Match match = matchRepository.findById(matchId)
                 .orElseThrow(() -> new ResourceNotFoundException("Partido", matchId));
 
         if (courtId == null) {
+            // Quitar cancha y horario → vuelve a PENDING
             match.setCourt(null);
             match.setScheduledStart(null);
             match.setScheduledEnd(null);
@@ -542,12 +555,23 @@ public class FixtureService {
             Court court = courtRepository.findById(courtId)
                     .orElseThrow(() -> new ResourceNotFoundException("Cancha", courtId));
             match.setCourt(court);
-            if (match.getStatus() == MatchStatus.PENDING) {
+
+            // Si se provee un nuevo horario, actualizarlo (calculando scheduledEnd automáticamente)
+            if (scheduledStart != null) {
+                int duration = match.getTournament().getMatchDurationMinutes();
+                match.setScheduledStart(scheduledStart);
+                match.setScheduledEnd(scheduledStart.plusMinutes(duration));
+            }
+
+            // Determinar estado según disponibilidad de información
+            if (match.getScheduledStart() != null) {
                 match.setStatus(MatchStatus.SCHEDULED);
             }
         }
+
         matchRepository.save(match);
-        log.info("Cancha actualizada: Match {} → Court {}", matchId, courtId);
+        log.info("Cancha/horario actualizado: Match {} → Court {}, Start {}",
+                matchId, courtId, scheduledStart);
         return toMatchDto(match);
     }
 
