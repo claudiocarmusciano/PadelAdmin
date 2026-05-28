@@ -1,12 +1,14 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { Plus, Pencil, Trash2, Building2, ChevronDown, ChevronUp, ToggleLeft, ToggleRight } from 'lucide-react'
+import { Plus, Pencil, Trash2, Building2, ChevronDown, ChevronUp, ToggleLeft, ToggleRight, Clock } from 'lucide-react'
+import { CourtAvailabilityDialog } from '@/components/courts/CourtAvailabilityDialog'
 import {
   getComplexes, createComplex, updateComplex, deleteComplex,
   getCourts, createCourt, updateCourt, deleteCourt,
 } from '@/api/complexes'
 import { apiErrorMessage } from '@/lib/axios'
+import { useAuth } from '@/contexts/AuthContext'
 import type { Complex, Court } from '@/types'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -21,7 +23,9 @@ const defaultComplexForm: ComplexForm = { name: '', address: '', phone: '' }
 
 function CourtsSection({ complex }: { complex: Complex }) {
   const qc = useQueryClient()
+  const { isAdmin } = useAuth()
   const [courtName, setCourtName] = useState('')
+  const [availabilityCourt, setAvailabilityCourt] = useState<Court | null>(null)
 
   const { data: courts = [] } = useQuery({
     queryKey: ['courts', complex.id],
@@ -69,51 +73,73 @@ function CourtsSection({ complex }: { complex: Complex }) {
                 size="sm"
                 variant="ghost"
                 className="h-7 w-7 p-0"
-                onClick={() => toggleMut.mutate(court)}
-                title={court.active ? 'Desactivar' : 'Activar'}
+                onClick={() => setAvailabilityCourt(court)}
+                title="Horarios"
               >
-                {court.active
-                  ? <ToggleRight size={14} className="text-primary" />
-                  : <ToggleLeft size={14} className="text-muted-foreground" />}
+                <Clock size={13} className="text-sky-400" />
               </Button>
-              <Button
-                size="sm"
-                variant="ghost"
-                className="h-7 w-7 p-0"
-                onClick={() => {
-                  if (confirm(`¿Eliminar la cancha "${court.name}"?`)) deleteMut.mutate(court.id)
-                }}
-              >
-                <Trash2 size={12} className="text-destructive" />
-              </Button>
+              {isAdmin && (
+                <>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-7 w-7 p-0"
+                    onClick={() => toggleMut.mutate(court)}
+                    title={court.active ? 'Desactivar' : 'Activar'}
+                  >
+                    {court.active
+                      ? <ToggleRight size={14} className="text-primary" />
+                      : <ToggleLeft size={14} className="text-muted-foreground" />}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-7 w-7 p-0"
+                    onClick={() => {
+                      if (confirm(`¿Eliminar la cancha "${court.name}"?`)) deleteMut.mutate(court.id)
+                    }}
+                  >
+                    <Trash2 size={12} className="text-destructive" />
+                  </Button>
+                </>
+              )}
             </div>
           ))}
         </div>
       ) : (
         <p className="text-xs text-muted-foreground">Sin canchas</p>
       )}
-      <div className="flex items-center gap-2 mt-3">
-        <Input
-          value={courtName}
-          onChange={(e) => setCourtName(e.target.value)}
-          placeholder="Nombre de la cancha"
-          className="h-8 text-sm"
-          onKeyDown={(e) => e.key === 'Enter' && courtName && createMut.mutate()}
-        />
-        <Button
-          size="sm"
-          disabled={!courtName || createMut.isPending}
-          onClick={() => createMut.mutate()}
-        >
-          <Plus size={13} />
-        </Button>
-      </div>
+      {isAdmin && (
+        <div className="flex items-center gap-2 mt-3">
+          <Input
+            value={courtName}
+            onChange={(e) => setCourtName(e.target.value)}
+            placeholder="Nombre de la cancha"
+            className="h-8 text-sm"
+            onKeyDown={(e) => e.key === 'Enter' && courtName && createMut.mutate()}
+          />
+          <Button
+            size="sm"
+            disabled={!courtName || createMut.isPending}
+            onClick={() => createMut.mutate()}
+          >
+            <Plus size={13} />
+          </Button>
+        </div>
+      )}
+
+      <CourtAvailabilityDialog
+        courtId={availabilityCourt?.id ?? null}
+        courtName={availabilityCourt?.name}
+        onClose={() => setAvailabilityCourt(null)}
+      />
     </div>
   )
 }
 
 export default function ComplexesPage() {
   const qc = useQueryClient()
+  const { isAdmin } = useAuth()
   const [open, setOpen] = useState(false)
   const [editing, setEditing] = useState<Complex | null>(null)
   const [form, setForm] = useState<ComplexForm>(defaultComplexForm)
@@ -190,10 +216,12 @@ export default function ComplexesPage() {
           <h1 className="text-2xl font-bold">Complejos</h1>
           <p className="text-muted-foreground text-sm">Complejos de pádel y sus canchas</p>
         </div>
-        <Button onClick={() => handleOpen()}>
-          <Plus size={16} className="mr-2" />
-          Nuevo complejo
-        </Button>
+        {isAdmin && (
+          <Button onClick={() => handleOpen()}>
+            <Plus size={16} className="mr-2" />
+            Nuevo complejo
+          </Button>
+        )}
       </div>
 
       {isLoading ? (
@@ -203,10 +231,12 @@ export default function ComplexesPage() {
           <CardContent className="flex flex-col items-center justify-center py-16 gap-3">
             <Building2 size={40} className="text-muted-foreground" />
             <p className="font-medium">No hay complejos</p>
-            <Button onClick={() => handleOpen()}>
-              <Plus size={16} className="mr-2" />
-              Nuevo complejo
-            </Button>
+            {isAdmin && (
+              <Button onClick={() => handleOpen()}>
+                <Plus size={16} className="mr-2" />
+                Nuevo complejo
+              </Button>
+            )}
           </CardContent>
         </Card>
       ) : (
@@ -222,18 +252,22 @@ export default function ComplexesPage() {
                     </p>
                   </div>
                   <div className="flex items-center gap-1">
-                    <Button size="sm" variant="ghost" onClick={() => handleOpen(c)}>
-                      <Pencil size={14} />
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => {
-                        if (confirm(`¿Eliminar "${c.name}"?`)) deleteMut.mutate(c.id)
-                      }}
-                    >
-                      <Trash2 size={14} className="text-destructive" />
-                    </Button>
+                    {isAdmin && (
+                      <>
+                        <Button size="sm" variant="ghost" onClick={() => handleOpen(c)}>
+                          <Pencil size={14} />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => {
+                            if (confirm(`¿Eliminar "${c.name}"?`)) deleteMut.mutate(c.id)
+                          }}
+                        >
+                          <Trash2 size={14} className="text-destructive" />
+                        </Button>
+                      </>
+                    )}
                     <Button
                       size="sm"
                       variant="ghost"

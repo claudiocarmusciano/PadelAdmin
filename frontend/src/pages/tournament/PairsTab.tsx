@@ -1,15 +1,18 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { Plus, Trash2, Users, ChevronDown, ChevronUp, Clock, Ban, Star } from 'lucide-react'
+import { Plus, Trash2, Users, ChevronDown, ChevronUp, Clock, Ban, Star, UserPlus } from 'lucide-react'
 import { getPairs, createPair, deletePair, addConstraint, deleteConstraint } from '@/api/pairs'
 import { apiErrorMessage } from '@/lib/axios'
-import { getPlayers, getPlayerPoints } from '@/api/players'
+import { useAuth } from '@/contexts/AuthContext'
+import { getPlayers, getPlayerPoints, createPlayer, upsertPlayerPoints, getPlayersWithCategories } from '@/api/players'
+import { getCategories } from '@/api/categories'
 import type { Player, Pair, ConstraintType, PlayerCategoryPoints } from '@/types'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { PlayerCombobox } from '@/components/ui/player-combobox'
@@ -66,6 +69,7 @@ function formatTime(t: string) {
 
 function ConstraintsSection({ pair, tournamentId, locked, allowedDays }: { pair: Pair; tournamentId: number; locked: boolean; allowedDays: number[] }) {
   const qc = useQueryClient()
+  const { isAdmin } = useAuth()
   const [open, setOpen] = useState(false)
   const [cType, setCType] = useState<ConstraintType>('RESTRICTION')
   const [day, setDay] = useState<string>('')
@@ -120,12 +124,12 @@ function ConstraintsSection({ pair, tournamentId, locked, allowedDays }: { pair:
         </p>
         {locked ? (
           <span className="text-xs text-muted-foreground italic">Bloqueado — fixture generado</span>
-        ) : (
+        ) : isAdmin ? (
           <Button size="sm" variant="outline" className="h-7 text-xs px-2" onClick={() => setOpen(true)}>
             <Plus size={12} className="mr-1" />
             Agregar
           </Button>
-        )}
+        ) : null}
       </div>
 
       {pair.constraints.length === 0 ? (
@@ -149,7 +153,7 @@ function ConstraintsSection({ pair, tournamentId, locked, allowedDays }: { pair:
               <span className="font-medium">{c.dayName}</span>
               <Clock size={10} className="opacity-60" />
               <span>{formatTime(c.slotStart)} – {formatTime(c.slotEnd)}</span>
-              {!locked && (
+              {!locked && isAdmin && (
                 <button
                   onClick={() => delMut.mutate(c.id)}
                   className="ml-0.5 opacity-60 hover:opacity-100 transition-opacity"
@@ -257,6 +261,7 @@ function PairRow({ pair, idx, tournamentId, fixtureGenerated, allowedDays, onDel
   allowedDays: number[]
   onDelete: () => void
 }) {
+  const { isAdmin } = useAuth()
   const [expanded, setExpanded] = useState(false)
 
   return (
@@ -295,20 +300,181 @@ function PairRow({ pair, idx, tournamentId, fixtureGenerated, allowedDays, onDel
           >
             {expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
           </Button>
-          <Button
-            size="sm"
-            variant="ghost"
-            className="h-7 w-7 p-0 shrink-0"
-            onClick={() => { if (confirm('¿Eliminar esta pareja?')) onDelete() }}
-          >
-            <Trash2 size={14} className="text-destructive" />
-          </Button>
+          {isAdmin && (
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-7 w-7 p-0 shrink-0"
+              onClick={() => { if (confirm('¿Eliminar esta pareja?')) onDelete() }}
+            >
+              <Trash2 size={14} className="text-destructive" />
+            </Button>
+          )}
         </div>
         {expanded && (
           <ConstraintsSection pair={pair} tournamentId={tournamentId} locked={fixtureGenerated} allowedDays={allowedDays} />
         )}
       </CardContent>
     </Card>
+  )
+}
+
+// ── Dialog rápido para crear un jugador nuevo desde "Nueva pareja" ──────────
+
+interface QuickNewPlayerForm {
+  firstName: string
+  lastName: string
+  phone: string
+  categoryId: string
+  points: string
+}
+
+const emptyNewPlayer: QuickNewPlayerForm = {
+  firstName: '',
+  lastName: '',
+  phone: '',
+  categoryId: '',
+  points: '0',
+}
+
+function QuickNewPlayerDialog({
+  open,
+  onClose,
+  onCreated,
+}: {
+  open: boolean
+  onClose: () => void
+  onCreated: (player: Player, categoryId: number, points: number) => void
+}) {
+  const [form, setForm] = useState<QuickNewPlayerForm>(emptyNewPlayer)
+  const [saving, setSaving] = useState(false)
+
+  const { data: categories = [] } = useQuery({
+    queryKey: ['categories'],
+    queryFn: getCategories,
+  })
+
+  function reset() {
+    setForm(emptyNewPlayer)
+  }
+
+  function handleClose() {
+    reset()
+    onClose()
+  }
+
+  async function handleSubmit() {
+    if (!form.firstName.trim() || !form.lastName.trim()) {
+      toast.error('Nombre y apellido son obligatorios')
+      return
+    }
+    if (!form.categoryId) {
+      toast.error('Elegí la categoría con la que aporta a la pareja')
+      return
+    }
+    const pts = parseFloat(form.points)
+    if (isNaN(pts) || pts < 0) {
+      toast.error('Los puntos deben ser un número ≥ 0')
+      return
+    }
+
+    setSaving(true)
+    try {
+      const newPlayer = await createPlayer({
+        firstName: form.firstName.trim(),
+        lastName: form.lastName.trim(),
+        phone: form.phone.trim(),
+      })
+      await upsertPlayerPoints(newPlayer.id, {
+        categoryId: Number(form.categoryId),
+        points: pts,
+      })
+      toast.success(`Jugador "${newPlayer.lastName}, ${newPlayer.firstName}" creado`)
+      onCreated(newPlayer, Number(form.categoryId), pts)
+      reset()
+    } catch (e) {
+      toast.error(apiErrorMessage(e, 'Error al crear el jugador'))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={(o) => !o && handleClose()}>
+      <DialogContent className="max-w-sm">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <UserPlus size={18} className="text-primary" />
+            Nuevo jugador
+          </DialogTitle>
+        </DialogHeader>
+        <div className="grid gap-3 py-2">
+          <div className="grid grid-cols-2 gap-3">
+            <div className="grid gap-1.5">
+              <Label className="text-xs">Nombre *</Label>
+              <Input
+                value={form.firstName}
+                onChange={(e) => setForm({ ...form, firstName: e.target.value })}
+                placeholder="Juan"
+              />
+            </div>
+            <div className="grid gap-1.5">
+              <Label className="text-xs">Apellido *</Label>
+              <Input
+                value={form.lastName}
+                onChange={(e) => setForm({ ...form, lastName: e.target.value })}
+                placeholder="García"
+              />
+            </div>
+          </div>
+          <div className="grid gap-1.5">
+            <Label className="text-xs">Teléfono</Label>
+            <Input
+              value={form.phone}
+              onChange={(e) => setForm({ ...form, phone: e.target.value })}
+              placeholder="Opcional"
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-3 border-t pt-3">
+            <div className="grid gap-1.5">
+              <Label className="text-xs">Categoría *</Label>
+              <Select
+                value={form.categoryId}
+                onValueChange={(v) => setForm({ ...form, categoryId: v })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Elegí" />
+                </SelectTrigger>
+                <SelectContent>
+                  {categories.map((c) => (
+                    <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid gap-1.5">
+              <Label className="text-xs">Puntos previos</Label>
+              <Input
+                type="number"
+                min={0}
+                step={0.5}
+                value={form.points}
+                onChange={(e) => setForm({ ...form, points: e.target.value })}
+              />
+            </div>
+          </div>
+          <p className="text-[10px] text-muted-foreground -mt-1">
+            El jugador quedará disponible para futuros torneos. Después podés editar puntos / categorías desde "Jugadores".
+          </p>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={handleClose} disabled={saving}>Cancelar</Button>
+          <Button onClick={handleSubmit} disabled={saving}>
+            {saving ? 'Creando...' : 'Crear y seleccionar'}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }
 
@@ -329,19 +495,50 @@ export default function PairsTab({ tournamentId, fixtureGenerated, startDate, en
   // Si hay días de zona configurados, usar esos. Si no, usar todos los días del rango del torneo.
   const allowedDays = zoneDays.length > 0 ? zoneDays : getTournamentDays(startDate, endDate)
   const qc = useQueryClient()
+  const { isAdmin } = useAuth()
   const [open, setOpen] = useState(false)
   const [slot1, setSlot1] = useState<PlayerSlot>(emptySlot)
   const [slot2, setSlot2] = useState<PlayerSlot>(emptySlot)
+  // 1 o 2 según qué slot disparó "Nuevo jugador" (null si está cerrado)
+  const [newPlayerTarget, setNewPlayerTarget] = useState<1 | 2 | null>(null)
+  // Filtro de categoría para acotar la lista de jugadores en el dialog. '' = todas.
+  const [categoryFilter, setCategoryFilter] = useState<string>('')
 
   const { data: pairs = [], isLoading } = useQuery({
     queryKey: ['pairs', tournamentId],
     queryFn: () => getPairs(tournamentId),
   })
 
-  const { data: players = [] } = useQuery({
+  const { data: allPlayers = [] } = useQuery({
     queryKey: ['players'],
     queryFn: () => getPlayers(),
   })
+
+  const { data: categories = [] } = useQuery({
+    queryKey: ['categories'],
+    queryFn: getCategories,
+  })
+
+  // Cuando hay filtro de categoría, traer solo jugadores con puntos en esa categoría
+  // (con el ranking ya calculado). Si no hay filtro, usar la lista global.
+  const categoryFilterId = categoryFilter ? Number(categoryFilter) : undefined
+  const { data: filteredPlayersData = [] } = useQuery({
+    queryKey: ['playersWithCategories', categoryFilterId],
+    queryFn: () => getPlayersWithCategories({ categoryId: categoryFilterId }),
+    enabled: categoryFilterId !== undefined,
+  })
+
+  // Lista efectiva de jugadores disponibles para el combobox
+  const players = categoryFilterId
+    ? filteredPlayersData.map((p) => ({
+        id: p.id,
+        firstName: p.firstName,
+        lastName: p.lastName,
+        phone: p.phone,
+        telegramChatId: p.telegramChatId,
+        createdAt: '',
+      }))
+    : allPlayers
 
   const createMut = useMutation({
     mutationFn: () => createPair(tournamentId, {
@@ -376,7 +573,15 @@ export default function PairsTab({ tournamentId, fixtureGenerated, startDate, en
     }
     try {
       const cats = await getPlayerPoints(Number(playerId))
-      setSlot({ playerId, categoryId: cats.length === 1 ? String(cats[0].categoryId) : '', categories: cats, loadingCats: false })
+      // Si hay filtro de categoría activo y el jugador la tiene → preseleccionar.
+      // Si no, autoselect si solo tiene 1 categoría.
+      let preselected = ''
+      if (categoryFilter && cats.some((c) => String(c.categoryId) === categoryFilter)) {
+        preselected = categoryFilter
+      } else if (cats.length === 1) {
+        preselected = String(cats[0].categoryId)
+      }
+      setSlot({ playerId, categoryId: preselected, categories: cats, loadingCats: false })
     } catch {
       toast.error('No se pudieron cargar las categorías del jugador')
       setSlot({ ...slot, playerId, categoryId: '', categories: [], loadingCats: false })
@@ -387,6 +592,37 @@ export default function PairsTab({ tournamentId, fixtureGenerated, startDate, en
     setOpen(false)
     setSlot1(emptySlot)
     setSlot2(emptySlot)
+    setCategoryFilter('')
+  }
+
+  function handleCategoryFilterChange(v: string) {
+    const next = v === 'all' ? '' : v
+    setCategoryFilter(next)
+    // Limpiar slots porque los jugadores previos pueden no pertenecer a la nueva categoría
+    setSlot1(emptySlot)
+    setSlot2(emptySlot)
+  }
+
+  /** Tras crear un jugador desde el sub-dialog: lo carga en el slot que disparó la acción. */
+  async function handleNewPlayerCreated(player: Player, categoryId: number, _points: number) {
+    // Invalida cache para que el combobox lo vea
+    await qc.invalidateQueries({ queryKey: ['players'] })
+    const target = newPlayerTarget
+    setNewPlayerTarget(null)
+    // Carga las categorías reales (con nombre) y selecciona la que se acaba de crear
+    try {
+      const cats = await getPlayerPoints(player.id)
+      const newSlot: PlayerSlot = {
+        playerId: String(player.id),
+        categoryId: String(categoryId),
+        categories: cats,
+        loadingCats: false,
+      }
+      if (target === 1) setSlot1(newSlot)
+      else if (target === 2) setSlot2(newSlot)
+    } catch {
+      // Fallback silencioso: en peor caso el slot queda vacío y el usuario re-elige
+    }
   }
 
   function handleSubmit() {
@@ -427,10 +663,12 @@ export default function PairsTab({ tournamentId, fixtureGenerated, startDate, en
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <p className="text-sm text-muted-foreground">{pairs.length} pareja{pairs.length !== 1 ? 's' : ''}</p>
-        <Button size="sm" onClick={() => setOpen(true)}>
-          <Plus size={15} className="mr-1.5" />
-          Agregar pareja
-        </Button>
+        {isAdmin && (
+          <Button size="sm" onClick={() => setOpen(true)}>
+            <Plus size={15} className="mr-1.5" />
+            Agregar pareja
+          </Button>
+        )}
       </div>
 
       {isLoading ? (
@@ -440,10 +678,12 @@ export default function PairsTab({ tournamentId, fixtureGenerated, startDate, en
           <CardContent className="flex flex-col items-center justify-center py-12 text-center gap-3">
             <Users size={32} className="text-muted-foreground" />
             <p className="font-medium text-sm">No hay parejas</p>
-            <Button size="sm" onClick={() => setOpen(true)}>
-              <Plus size={15} className="mr-1.5" />
-              Agregar pareja
-            </Button>
+            {isAdmin && (
+              <Button size="sm" onClick={() => setOpen(true)}>
+                <Plus size={15} className="mr-1.5" />
+                Agregar pareja
+              </Button>
+            )}
           </CardContent>
         </Card>
       ) : (
@@ -463,18 +703,54 @@ export default function PairsTab({ tournamentId, fixtureGenerated, startDate, en
       )}
 
       {/* Dialog nueva pareja */}
-      <Dialog open={open} onOpenChange={setOpen}>
+      <Dialog open={open} onOpenChange={(o) => o ? setOpen(true) : handleClose()}>
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Nueva pareja</DialogTitle>
           </DialogHeader>
           <div className="grid gap-5 py-2">
+            {/* Filtro de categoría — acota la lista de jugadores en los combobox */}
+            <div className="grid gap-1.5 border-b pb-3">
+              <Label className="text-xs text-muted-foreground uppercase tracking-wide">
+                Filtrar jugadores por categoría
+              </Label>
+              <Select value={categoryFilter || 'all'} onValueChange={handleCategoryFilterChange}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Todas las categorías" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todas las categorías</SelectItem>
+                  {categories.map((c) => (
+                    <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {categoryFilter && (
+                <p className="text-[10px] text-muted-foreground">
+                  Mostrando {players.length} jugador{players.length === 1 ? '' : 'es'} de
+                  {' '}<strong>{categories.find((c) => c.id === categoryFilterId)?.name}</strong>
+                </p>
+              )}
+            </div>
+
             {([
-              { label: 'Jugador 1', slot: slot1, setSlot: setSlot1, otherId: slot2.playerId },
-              { label: 'Jugador 2', slot: slot2, setSlot: setSlot2, otherId: slot1.playerId },
-            ] as const).map(({ label, slot, setSlot, otherId }) => (
+              { label: 'Jugador 1', slot: slot1, setSlot: setSlot1, otherId: slot2.playerId, target: 1 as const },
+              { label: 'Jugador 2', slot: slot2, setSlot: setSlot2, otherId: slot1.playerId, target: 2 as const },
+            ] as const).map(({ label, slot, setSlot, otherId, target }) => (
               <div key={label} className="grid gap-2">
-                <Label className="text-sm font-semibold">{label}</Label>
+                <div className="flex items-center justify-between">
+                  <Label className="text-sm font-semibold">{label}</Label>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    className="h-7 text-xs text-primary hover:text-primary px-2"
+                    onClick={() => setNewPlayerTarget(target)}
+                  >
+                    <UserPlus size={13} className="mr-1" />
+                    Nuevo jugador
+                  </Button>
+                </div>
 
                 {/* Selector de jugador con búsqueda */}
                 <PlayerCombobox
@@ -534,6 +810,13 @@ export default function PairsTab({ tournamentId, fixtureGenerated, startDate, en
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Sub-dialog: crear jugador nuevo desde adentro de "Nueva pareja" */}
+      <QuickNewPlayerDialog
+        open={newPlayerTarget !== null}
+        onClose={() => setNewPlayerTarget(null)}
+        onCreated={handleNewPlayerCreated}
+      />
     </div>
   )
 }

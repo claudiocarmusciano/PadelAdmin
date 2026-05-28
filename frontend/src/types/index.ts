@@ -56,6 +56,79 @@ export interface PlayerCategoryPoints {
   points: number
 }
 
+/** Categoría de un jugador con su posición en el ranking de esa categoría. */
+export interface PlayerCategoryRank {
+  categoryId: number
+  categoryName: string
+  points: number
+  /** Posición #N dentro de la categoría (1 = mejor). Empates comparten posición. */
+  rank: number
+  totalInCategory: number
+}
+
+export interface PlayerWithCategories {
+  id: number
+  firstName: string
+  lastName: string
+  phone: string
+  telegramChatId?: string
+  categories: PlayerCategoryRank[]
+}
+
+// ── Estadísticas históricas del jugador ──────────────────────────────────────
+
+export interface PartnerStat {
+  partnerId: number
+  partnerName: string
+  tournamentsTogether: number
+  matchesTogether: number
+  matchesWon: number
+}
+
+export type PlayerBestStage =
+  | 'CHAMPION' | 'FINALIST' | 'SEMIFINAL' | 'QUARTERFINAL'
+  | 'ROUND_8' | 'ROUND_16' | 'ROUND_32' | 'ZONE' | 'PARTICIPANT'
+
+export interface TournamentParticipation {
+  tournamentId: number
+  tournamentName: string
+  categoryName?: string
+  startDate: string
+  tournamentStatus: 'DRAFT' | 'ACTIVE' | 'COMPLETED'
+  bestStage: PlayerBestStage
+  partnerName: string
+  matchesPlayed: number
+  matchesWon: number
+}
+
+export interface PlayerStats {
+  playerId: number
+  firstName: string
+  lastName: string
+  // Torneos
+  tournamentsPlayed: number
+  tournamentsWon: number
+  tournamentsFinalist: number
+  tournamentsSemifinalist: number
+  // Partidos
+  matchesPlayed: number
+  matchesWon: number
+  matchesLost: number
+  walkoversReceived: number
+  walkoversGiven: number
+  // Sets
+  setsPlayed: number
+  setsWon: number
+  setsLost: number
+  // Games
+  gamesPlayed: number
+  gamesWon: number
+  gamesLost: number
+  // Detalle
+  topPartners: PartnerStat[]
+  tournamentHistory: TournamentParticipation[]
+}
+
 // ── Categorías ────────────────────────────────────────────────────────────────
 
 export interface Category {

@@ -1,11 +1,13 @@
 import { useState } from 'react'
 import { Outlet, NavLink } from 'react-router-dom'
-import { Trophy, Users, Tag, Building2, Settings, Menu, X } from 'lucide-react'
+import { Trophy, Users, Tag, Building2, Settings, Menu, X, LogOut } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import PadelAdminLogo from '@/components/logo/PadelAdminLogo'
 import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
+import { useAuth } from '@/contexts/AuthContext'
 
-const navItems = [
+const baseNavItems = [
   { to: '/tournaments', label: 'Torneos', icon: Trophy },
   { to: '/players', label: 'Jugadores', icon: Users },
   { to: '/categories', label: 'Categorías', icon: Tag },
@@ -32,7 +34,39 @@ function NavItem({ to, label, icon: Icon, hideLabel = false }: { to: string; lab
   )
 }
 
+function UserFooter({ hideLabels = false }: { hideLabels?: boolean }) {
+  const { user, isAdmin, logout } = useAuth()
+  if (!user) return null
+
+  if (hideLabels) {
+    return (
+      <div className="p-3 border-t flex justify-center">
+        <Button size="sm" variant="ghost" onClick={logout} title={`Cerrar sesión (${user.email})`}>
+          <LogOut size={16} />
+        </Button>
+      </div>
+    )
+  }
+
+  return (
+    <div className="p-3 border-t space-y-2">
+      <div className="px-1 space-y-1">
+        <p className="text-xs text-muted-foreground truncate" title={user.email}>{user.email}</p>
+        <Badge variant={isAdmin ? 'default' : 'secondary'} className="text-[10px] uppercase">
+          {isAdmin ? 'Admin' : 'Viewer'}
+        </Badge>
+      </div>
+      <Button size="sm" variant="ghost" className="w-full justify-start text-muted-foreground" onClick={logout}>
+        <LogOut size={14} className="mr-2" />
+        Cerrar sesión
+      </Button>
+    </div>
+  )
+}
+
 function Sidebar({ hideLabels = false }: { hideLabels?: boolean }) {
+  const { isAdmin } = useAuth()
+
   return (
     <aside className={cn(
       'border-r flex flex-col bg-background',
@@ -51,31 +85,31 @@ function Sidebar({ hideLabels = false }: { hideLabels?: boolean }) {
         )}
       </div>
       <nav className="flex-1 p-3 space-y-1">
-        {navItems.map(({ to, label, icon }) => (
+        {baseNavItems.map(({ to, label, icon }) => (
           <NavItem key={to} to={to} label={label} icon={icon} hideLabel={hideLabels} />
         ))}
       </nav>
-      {/* Admin section */}
-      <div className={cn(
-        'p-3 border-t space-y-1',
-        hideLabels && 'items-center flex flex-col'
-      )}>
-        {!hideLabels && (
-          <p className="px-3 pb-1 text-[10px] uppercase tracking-widest text-muted-foreground/60 font-semibold">
-            Admin
-          </p>
-        )}
-        <NavItem to="/settings" label="Configuración" icon={Settings} hideLabel={hideLabels} />
-      </div>
-      {!hideLabels && (
-        <div className="px-4 py-3 border-t text-xs text-muted-foreground">v1.0.0</div>
+      {isAdmin && (
+        <div className={cn(
+          'p-3 border-t space-y-1',
+          hideLabels && 'items-center flex flex-col'
+        )}>
+          {!hideLabels && (
+            <p className="px-3 pb-1 text-[10px] uppercase tracking-widest text-muted-foreground/60 font-semibold">
+              Admin
+            </p>
+          )}
+          <NavItem to="/settings" label="Configuración" icon={Settings} hideLabel={hideLabels} />
+        </div>
       )}
+      <UserFooter hideLabels={hideLabels} />
     </aside>
   )
 }
 
 export default function Layout() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const { user, isAdmin, logout } = useAuth()
 
   return (
     <div className="flex h-screen bg-background">
@@ -103,9 +137,7 @@ export default function Layout() {
           </Button>
           <div className="flex items-center gap-2">
             <PadelAdminLogo size={28} className="shrink-0" />
-            <div className="flex flex-col">
-              <h1 className="text-sm font-bold">Padel Admin</h1>
-            </div>
+            <h1 className="text-sm font-bold">Padel Admin</h1>
           </div>
           <div className="w-12" /> {/* Spacer for centering */}
         </div>
@@ -117,23 +149,46 @@ export default function Layout() {
               className="absolute inset-0 bg-black/50"
               onClick={() => setMobileMenuOpen(false)}
             />
-            <div className="absolute left-0 top-0 h-full w-56 bg-background border-r shadow-lg">
-              <nav className="p-3 space-y-1">
-                {navItems.map(({ to, label, icon }) => (
+            <div className="absolute left-0 top-0 h-full w-56 bg-background border-r shadow-lg flex flex-col">
+              <nav className="flex-1 p-3 space-y-1">
+                {baseNavItems.map(({ to, label, icon }) => (
                   <div key={to} onClick={() => setMobileMenuOpen(false)}>
                     <NavItem to={to} label={label} icon={icon} hideLabel={false} />
                   </div>
                 ))}
               </nav>
-              {/* Admin section */}
-              <div className="p-3 border-t space-y-1">
-                <p className="px-3 pb-1 text-[10px] uppercase tracking-widest text-muted-foreground/60 font-semibold">
-                  Admin
-                </p>
-                <div onClick={() => setMobileMenuOpen(false)}>
-                  <NavItem to="/settings" label="Configuración" icon={Settings} hideLabel={false} />
+              {isAdmin && (
+                <div className="p-3 border-t space-y-1">
+                  <p className="px-3 pb-1 text-[10px] uppercase tracking-widest text-muted-foreground/60 font-semibold">
+                    Admin
+                  </p>
+                  <div onClick={() => setMobileMenuOpen(false)}>
+                    <NavItem to="/settings" label="Configuración" icon={Settings} hideLabel={false} />
+                  </div>
                 </div>
-              </div>
+              )}
+              {user && (
+                <div className="p-3 border-t space-y-2">
+                  <div className="px-1 space-y-1">
+                    <p className="text-xs text-muted-foreground truncate">{user.email}</p>
+                    <Badge variant={isAdmin ? 'default' : 'secondary'} className="text-[10px] uppercase">
+                      {isAdmin ? 'Admin' : 'Viewer'}
+                    </Badge>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="w-full justify-start text-muted-foreground"
+                    onClick={() => {
+                      setMobileMenuOpen(false)
+                      logout()
+                    }}
+                  >
+                    <LogOut size={14} className="mr-2" />
+                    Cerrar sesión
+                  </Button>
+                </div>
+              )}
             </div>
           </div>
         )}

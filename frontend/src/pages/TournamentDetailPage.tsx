@@ -4,12 +4,14 @@ import { toast } from 'sonner'
 import { CheckCircle } from 'lucide-react'
 import { getTournament, updateTournamentStatus } from '@/api/tournaments'
 import { apiErrorMessage } from '@/lib/axios'
+import { useAuth } from '@/contexts/AuthContext'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import PairsTab from '@/pages/tournament/PairsTab'
 import ZonesTab from '@/pages/tournament/ZonesTab'
 import FixtureTab from '@/pages/tournament/FixtureTab'
+import CalendarTab from '@/pages/tournament/CalendarTab'
 import BracketTab from '@/pages/tournament/BracketTab'
 
 const statusColors: Record<string, string> = {
@@ -27,6 +29,7 @@ const tabs = [
   { path: 'pairs', label: 'Parejas' },
   { path: 'zones', label: 'Zonas' },
   { path: 'fixture', label: 'Fixture' },
+  { path: 'calendar', label: 'Calendario' },
   { path: 'bracket', label: 'Bracket' },
 ]
 
@@ -34,6 +37,7 @@ export default function TournamentDetailPage() {
   const { id } = useParams<{ id: string }>()
   const tournamentId = Number(id)
   const qc = useQueryClient()
+  const { isAdmin } = useAuth()
 
   const { data: tournament, isLoading } = useQuery({
     queryKey: ['tournament', tournamentId],
@@ -74,7 +78,7 @@ export default function TournamentDetailPage() {
             {tournament.categoryName} · {tournament.complexName} · {tournament.startDate} → {tournament.endDate}
           </p>
         </div>
-        {tournament.status === 'ACTIVE' && (
+        {isAdmin && tournament.status === 'ACTIVE' && (
           <Button
             variant="outline"
             size="sm"
@@ -114,6 +118,7 @@ export default function TournamentDetailPage() {
         <Route path="pairs" element={<PairsTab tournamentId={tournamentId} fixtureGenerated={tournament.fixtureGenerated} startDate={tournament.startDate} endDate={tournament.endDate} zoneDays={tournament.zoneDays ?? []} />} />
         <Route path="zones" element={<ZonesTab tournamentId={tournamentId} />} />
         <Route path="fixture" element={<FixtureTab tournamentId={tournamentId} startDate={tournament.startDate} endDate={tournament.endDate} zoneDays={tournament.zoneDays ?? []} />} />
+        <Route path="calendar" element={<CalendarTab tournamentId={tournamentId} />} />
         <Route path="bracket" element={<BracketTab tournamentId={tournamentId} />} />
       </Routes>
     </div>

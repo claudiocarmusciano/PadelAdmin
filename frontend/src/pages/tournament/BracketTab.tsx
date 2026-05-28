@@ -4,6 +4,7 @@ import { toast } from 'sonner'
 import { Trophy } from 'lucide-react'
 import { generateElimination, getElimination } from '@/api/tournaments'
 import { apiErrorMessage } from '@/lib/axios'
+import { useAuth } from '@/contexts/AuthContext'
 import type { EliminationMatch, MatchResponse } from '@/types'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -33,11 +34,12 @@ function BracketMatch({
   match: EliminationMatch
   onResult: (m: EliminationMatch) => void
 }) {
+  const { isAdmin } = useAuth()
   const isBye = match.bye
   const canLoadResult =
-    !isBye && match.pair1 && match.pair2 &&
+    isAdmin && !isBye && match.pair1 && match.pair2 &&
     (match.status === 'PENDING' || match.status === 'SCHEDULED' || match.status === 'CONFIRMED')
-  const canEdit = !isBye && match.pair1 && match.pair2 && match.status === 'PLAYED'
+  const canEdit = isAdmin && !isBye && match.pair1 && match.pair2 && match.status === 'PLAYED'
 
   return (
     <div
@@ -196,6 +198,7 @@ function RoundConnector({ numFeeders, totalH }: { numFeeders: number; totalH: nu
 
 export default function BracketTab({ tournamentId }: Props) {
   const qc = useQueryClient()
+  const { isAdmin } = useAuth()
   const [resultMatch, setResultMatch] = useState<EliminationMatch | null>(null)
 
   const { data: bracket, isLoading } = useQuery({
@@ -245,10 +248,12 @@ export default function BracketTab({ tournamentId }: Props) {
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-3">
-        <Button onClick={() => generateMut.mutate()} disabled={generateMut.isPending}>
-          <Trophy size={15} className="mr-1.5" />
-          {bracket ? 'Regenerar bracket' : 'Generar bracket'}
-        </Button>
+        {isAdmin && (
+          <Button onClick={() => generateMut.mutate()} disabled={generateMut.isPending}>
+            <Trophy size={15} className="mr-1.5" />
+            {bracket ? 'Regenerar bracket' : 'Generar bracket'}
+          </Button>
+        )}
         {bracket && (
           <span className="text-sm text-muted-foreground">
             {bracket.totalClassified} clasificados · bracket de {bracket.bracketSize}

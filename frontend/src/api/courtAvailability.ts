@@ -1,0 +1,29 @@
+import api from '@/lib/axios'
+
+export interface CourtAvailability {
+  id: number
+  dayOfWeek: number // 0=Lunes ... 6=Domingo
+  dayName: string
+  openTime: string  // "HH:mm" o "HH:mm:ss"
+  closeTime: string
+}
+
+export const getCourtAvailability = async (courtId: number): Promise<CourtAvailability[]> => {
+  const { data } = await api.get(`/courts/${courtId}/availability`)
+  return data
+}
+
+export const upsertCourtAvailability = async (
+  courtId: number,
+  dto: { dayOfWeek: number; openTime: string; closeTime: string }
+): Promise<CourtAvailability> => {
+  const { data } = await api.post(`/courts/${courtId}/availability`, dto)
+  return data
+}
+
+export const deleteCourtAvailability = async (
+  courtId: number,
+  availabilityId: number
+): Promise<void> => {
+  await api.delete(`/courts/${courtId}/availability/${availabilityId}`)
+}

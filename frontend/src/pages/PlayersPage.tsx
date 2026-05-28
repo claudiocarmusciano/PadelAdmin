@@ -1,11 +1,13 @@
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { Plus, Pencil, Trash2, Search, Users, ChevronDown, ChevronUp } from 'lucide-react'
-import { getPlayers, createPlayer, updatePlayer, deletePlayer, getPlayerPoints, upsertPlayerPoints, deletePlayerPoints } from '@/api/players'
+import { Plus, Pencil, Trash2, Search, Users, ChevronDown, ChevronUp, BarChart3 } from 'lucide-react'
+import { getPlayersWithCategories, createPlayer, updatePlayer, deletePlayer, getPlayerPoints, upsertPlayerPoints, deletePlayerPoints } from '@/api/players'
+import { PlayerStatsDialog } from '@/components/players/PlayerStatsDialog'
 import { apiErrorMessage } from '@/lib/axios'
 import { getCategories } from '@/api/categories'
-import type { Player, PlayerRequest, PlayerCategoryPoints } from '@/types'
+import { useAuth } from '@/contexts/AuthContext'
+import type { Player, PlayerRequest, PlayerCategoryPoints, PlayerWithCategories } from '@/types'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -22,8 +24,9 @@ const defaultForm: PlayerRequest = {
 }
 
 // ── Sección de categorías/puntos por jugador ───────────────────────────────
-function PlayerCategoriesSection({ player }: { player: Player }) {
+function PlayerCategoriesSection({ player }: { player: { id: number; firstName: string; lastName: string } }) {
   const qc = useQueryClient()
+  const { isAdmin } = useAuth()
   const [addOpen, setAddOpen] = useState(false)
   const [selectedCategoryId, setSelectedCategoryId] = useState('')
   const [points, setPoints] = useState('')
@@ -46,6 +49,7 @@ function PlayerCategoriesSection({ player }: { player: Player }) {
       }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['playerPoints', player.id] })
+      qc.invalidateQueries({ queryKey: ['playersWithCategories'] })
       toast.success('Puntos guardados')
       setAddOpen(false)
       setSelectedCategoryId('')
@@ -58,6 +62,7 @@ function PlayerCategoriesSection({ player }: { player: Player }) {
     mutationFn: (categoryId: number) => deletePlayerPoints(player.id, categoryId),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['playerPoints', player.id] })
+      qc.invalidateQueries({ queryKey: ['playersWithCategories'] })
       toast.success('Categoría removida')
     },
     onError: (error) => toast.error(apiErrorMessage(error, 'Error al eliminar')),
@@ -80,7 +85,7 @@ function PlayerCategoriesSection({ player }: { player: Player }) {
         <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
           Categorías y puntos
         </p>
-        {availableCategories.length > 0 && (
+        {isAdmin && availableCategories.length > 0 && (
           <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setAddOpen(true)}>
             <Plus size={13} className="mr-1" />
             Agregar
@@ -103,16 +108,18 @@ function PlayerCategoriesSection({ player }: { player: Player }) {
               <Badge variant="outline" className="text-xs h-5 px-1.5">
                 {pp.points} pts
               </Badge>
-              <button
-                className="text-muted-foreground hover:text-destructive transition-colors ml-0.5"
-                onClick={() => {
-                  if (confirm(`¿Quitar ${pp.categoryName} de ${player.firstName}?`)) {
-                    deleteMut.mutate(pp.categoryId)
-                  }
-                }}
-              >
-                <Trash2 size={11} />
-              </button>
+              {isAdmin && (
+                <button
+                  className="text-muted-foreground hover:text-destructive transition-colors ml-0.5"
+                  onClick={() => {
+                    if (confirm(`¿Quitar ${pp.categoryName} de ${player.firstName}?`)) {
+                      deleteMut.mutate(pp.categoryId)
+                    }
+                  }}
+                >
+                  <Trash2 size={11} />
+                </button>
+              )}
             </div>
           ))}
         </div>
@@ -161,47 +168,78 @@ function PlayerCategoriesSection({ player }: { player: Player }) {
 // ── Fila de jugador ────────────────────────────────────────────────────────
 function PlayerRow({
   player,
+  highlightCategoryId,
   onEdit,
   onDelete,
+  onStats,
 }: {
-  player: Player
-  onEdit: (p: Player) => void
-  onDelete: (p: Player) => void
+  player: PlayerWithCategories
+  /** Si está seteado, el chip de esa categoría se resalta (cuando hay filtro activo). */
+  highlightCategoryId?: number
+  onEdit: (p: PlayerWithCategories) => void
+  onDelete: (p: PlayerWithCategories) => void
+  onStats: (p: PlayerWithCategories) => void
 }) {
+  const { isAdmin } = useAuth()
   const [expanded, setExpanded] = useState(false)
 
-  const { data: playerPoints = [] } = useQuery({
-    queryKey: ['playerPoints', player.id],
-    queryFn: () => getPlayerPoints(player.id),
-  })
-
+  const hasFilter = highlightCategoryId !== undefined
   return (
     <Card>
       <CardContent className="p-0">
-        <div className="flex items-center gap-3 px-4 py-3">
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="font-medium text-sm">
-                {player.firstName} {player.lastName}
-              </span>
-              {playerPoints.map((pp: PlayerCategoryPoints) => (
-                <Badge key={pp.categoryId} variant="outline" className="text-xs h-5 px-1.5">
-                  {pp.categoryName} · {pp.points} pts
-                </Badge>
-              ))}
+        <div className="flex items-start gap-3 px-4 py-3">
+          <div className="flex-1 min-w-0 space-y-1.5">
+            <div className="font-medium text-sm">
+              {player.lastName}{player.firstName ? `, ${player.firstName}` : ''}
             </div>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              {player.phone}
-              {player.telegramChatId ? ` · Telegram: ${player.telegramChatId}` : ''}
-            </p>
+            {player.categories.length > 0 && (
+              <div className="flex items-center gap-1.5 flex-wrap">
+                {player.categories.map((c) => {
+                  const isActive = hasFilter && highlightCategoryId === c.categoryId
+                  const isInactive = hasFilter && !isActive
+                  return (
+                    <Badge
+                      key={c.categoryId}
+                      variant={isActive ? 'default' : 'outline'}
+                      className={
+                        'text-xs h-5 px-1.5 ' +
+                        (isInactive ? 'bg-primary/15 text-foreground border-primary/30' : '')
+                      }
+                      title={`Posición ${c.rank} de ${c.totalInCategory} en ${c.categoryName}`}
+                    >
+                      {c.categoryName} · {c.points} pts · #{c.rank}
+                    </Badge>
+                  )
+                })}
+              </div>
+            )}
+            {(player.phone || player.telegramChatId) && (
+              <p className="text-xs text-muted-foreground">
+                {player.phone}
+                {player.telegramChatId ? ` · Telegram: ${player.telegramChatId}` : ''}
+              </p>
+            )}
           </div>
           <div className="flex items-center gap-1 shrink-0">
-            <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => onEdit(player)}>
-              <Pencil size={13} />
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-7 w-7 p-0"
+              onClick={() => onStats(player)}
+              title="Ver estadísticas"
+            >
+              <BarChart3 size={13} className="text-primary" />
             </Button>
-            <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => onDelete(player)}>
-              <Trash2 size={13} className="text-destructive" />
-            </Button>
+            {isAdmin && (
+              <>
+                <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => onEdit(player)}>
+                  <Pencil size={13} />
+                </Button>
+                <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => onDelete(player)}>
+                  <Trash2 size={13} className="text-destructive" />
+                </Button>
+              </>
+            )}
             <Button
               size="sm"
               variant="ghost"
@@ -222,20 +260,59 @@ function PlayerRow({
 // ── Página principal ───────────────────────────────────────────────────────
 export default function PlayersPage() {
   const qc = useQueryClient()
+  const { isAdmin } = useAuth()
   const [search, setSearch] = useState('')
+  const [categoryFilter, setCategoryFilter] = useState<string>('') // '' = todas
+  const [sortBy, setSortBy] = useState<'alpha' | 'rank'>('alpha')
   const [open, setOpen] = useState(false)
-  const [editing, setEditing] = useState<Player | null>(null)
+  const [editing, setEditing] = useState<PlayerWithCategories | null>(null)
   const [form, setForm] = useState<PlayerRequest>(defaultForm)
+  const [statsPlayer, setStatsPlayer] = useState<PlayerWithCategories | null>(null)
+
+  const categoryIdNum = categoryFilter ? Number(categoryFilter) : undefined
 
   const { data: players = [], isLoading } = useQuery({
-    queryKey: ['players', search],
-    queryFn: () => getPlayers(search || undefined),
+    queryKey: ['playersWithCategories', categoryIdNum, search],
+    queryFn: () => getPlayersWithCategories({ categoryId: categoryIdNum, search: search || undefined }),
   })
+
+  const { data: categories = [] } = useQuery({
+    queryKey: ['categories'],
+    queryFn: getCategories,
+  })
+
+  // Al cambiar el filtro de categoría, ajustar el sort default
+  useEffect(() => {
+    setSortBy(categoryFilter ? 'rank' : 'alpha')
+  }, [categoryFilter])
+
+  // Ordenamiento en cliente — el backend ya devuelve por ranking si hay filtro, pero
+  // permitimos al usuario alternar a alfabético (o viceversa sin filtro).
+  const sortedPlayers = useMemo(() => {
+    const list = [...players]
+    if (sortBy === 'rank' && categoryIdNum) {
+      list.sort((a, b) => {
+        const rA = a.categories.find((c) => c.categoryId === categoryIdNum)?.rank ?? 9999
+        const rB = b.categories.find((c) => c.categoryId === categoryIdNum)?.rank ?? 9999
+        if (rA !== rB) return rA - rB
+        return (a.lastName + a.firstName).localeCompare(b.lastName + b.firstName, 'es')
+      })
+    } else {
+      list.sort((a, b) =>
+        (a.lastName + ', ' + a.firstName).localeCompare(b.lastName + ', ' + b.firstName, 'es')
+      )
+    }
+    return list
+  }, [players, sortBy, categoryIdNum])
+
+  function invalidatePlayers() {
+    qc.invalidateQueries({ queryKey: ['playersWithCategories'] })
+  }
 
   const createMut = useMutation({
     mutationFn: (dto: PlayerRequest) => createPlayer(dto),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['players'] })
+      invalidatePlayers()
       toast.success('Jugador creado')
       handleClose()
     },
@@ -245,7 +322,7 @@ export default function PlayersPage() {
   const updateMut = useMutation({
     mutationFn: ({ id, dto }: { id: number; dto: PlayerRequest }) => updatePlayer(id, dto),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['players'] })
+      invalidatePlayers()
       toast.success('Jugador actualizado')
       handleClose()
     },
@@ -255,13 +332,13 @@ export default function PlayersPage() {
   const deleteMut = useMutation({
     mutationFn: (id: number) => deletePlayer(id),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['players'] })
+      invalidatePlayers()
       toast.success('Jugador eliminado')
     },
     onError: (error) => toast.error(apiErrorMessage(error, 'Error al eliminar el jugador')),
   })
 
-  function handleOpen(p?: Player) {
+  function handleOpen(p?: PlayerWithCategories) {
     if (p) {
       setEditing(p)
       setForm({
@@ -308,21 +385,55 @@ export default function PlayersPage() {
             Gestión de jugadores y sus categorías
           </p>
         </div>
-        <Button onClick={() => handleOpen()}>
-          <Plus size={16} className="mr-2" />
-          Nuevo jugador
-        </Button>
+        {isAdmin && (
+          <Button onClick={() => handleOpen()}>
+            <Plus size={16} className="mr-2" />
+            Nuevo jugador
+          </Button>
+        )}
       </div>
 
-      <div className="relative">
-        <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-        <Input
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Buscar jugadores..."
-          className="pl-9"
-        />
+      <div className="flex flex-col md:flex-row gap-2">
+        <div className="relative flex-1">
+          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Buscar jugadores..."
+            className="pl-9"
+          />
+        </div>
+        <Select value={categoryFilter || 'all'} onValueChange={(v) => setCategoryFilter(v === 'all' ? '' : v)}>
+          <SelectTrigger className="md:w-56">
+            <SelectValue placeholder="Todas las categorías" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todas las categorías</SelectItem>
+            {categories.map((c) => (
+              <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select value={sortBy} onValueChange={(v) => setSortBy(v as 'alpha' | 'rank')}>
+          <SelectTrigger className="md:w-44">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="alpha">Apellido (A-Z)</SelectItem>
+            <SelectItem value="rank" disabled={!categoryFilter}>
+              Ranking{!categoryFilter ? ' (requiere categoría)' : ''}
+            </SelectItem>
+          </SelectContent>
+        </Select>
       </div>
+
+      {categoryFilter && (
+        <p className="text-xs text-muted-foreground">
+          Mostrando {players.length} jugador{players.length === 1 ? '' : 'es'} de
+          {' '}<strong>{categories.find((c) => c.id === categoryIdNum)?.name}</strong>
+          {' '}— ordenados por {sortBy === 'rank' ? 'ranking' : 'apellido'}
+        </p>
+      )}
 
       {isLoading ? (
         <p className="text-muted-foreground text-sm">Cargando...</p>
@@ -330,8 +441,8 @@ export default function PlayersPage() {
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-16 gap-3">
             <Users size={40} className="text-muted-foreground" />
-            <p className="font-medium">{search ? 'Sin resultados' : 'No hay jugadores'}</p>
-            {!search && (
+            <p className="font-medium">{search || categoryFilter ? 'Sin resultados' : 'No hay jugadores'}</p>
+            {!search && !categoryFilter && isAdmin && (
               <Button onClick={() => handleOpen()}>
                 <Plus size={16} className="mr-2" />
                 Nuevo jugador
@@ -341,13 +452,15 @@ export default function PlayersPage() {
         </Card>
       ) : (
         <div className="grid gap-2">
-          {players.map((p) => (
+          {sortedPlayers.map((p) => (
             <PlayerRow
               key={p.id}
               player={p}
+              highlightCategoryId={categoryIdNum}
               onEdit={handleOpen}
+              onStats={(pl) => setStatsPlayer(pl)}
               onDelete={(pl) => {
-                if (confirm(`¿Eliminar a ${pl.firstName} ${pl.lastName}?`)) {
+                if (confirm(`¿Eliminar a ${pl.lastName}, ${pl.firstName}?`)) {
                   deleteMut.mutate(pl.id)
                 }
               }}
@@ -410,6 +523,12 @@ export default function PlayersPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <PlayerStatsDialog
+        playerId={statsPlayer?.id ?? null}
+        playerName={statsPlayer ? `${statsPlayer.lastName}, ${statsPlayer.firstName}` : undefined}
+        onClose={() => setStatsPlayer(null)}
+      />
     </div>
   )
 }

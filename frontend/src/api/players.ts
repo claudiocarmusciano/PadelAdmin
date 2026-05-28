@@ -1,8 +1,23 @@
 import api from '@/lib/axios'
-import type { Player, PlayerRequest, PlayerCategoryPoints } from '@/types'
+import type { Player, PlayerRequest, PlayerCategoryPoints, PlayerWithCategories, PlayerStats } from '@/types'
 
 export const getPlayers = async (search?: string): Promise<Player[]> => {
   const { data } = await api.get('/players', { params: search ? { search } : {} })
+  return data
+}
+
+/** Lista de jugadores con sus categorías + ranking en cada una (1 sola request).
+ *  - categoryId: filtra por categoría y ordena por ranking ASC (mejor primero).
+ *  - search: filtra por nombre/apellido (case insensitive).
+ *  - Sin filtros: orden alfabético por (lastName, firstName).
+ */
+export const getPlayersWithCategories = async (
+  opts: { categoryId?: number; search?: string } = {}
+): Promise<PlayerWithCategories[]> => {
+  const params: Record<string, string | number> = {}
+  if (opts.categoryId) params.categoryId = opts.categoryId
+  if (opts.search) params.search = opts.search
+  const { data } = await api.get('/players/with-categories', { params })
   return data
 }
 
@@ -40,4 +55,10 @@ export const upsertPlayerPoints = async (
 
 export const deletePlayerPoints = async (id: number, categoryId: number): Promise<void> => {
   await api.delete(`/players/${id}/categories/${categoryId}`)
+}
+
+/** Estadísticas históricas agregadas: torneos, partidos, sets, games, compañeros. */
+export const getPlayerStats = async (id: number): Promise<PlayerStats> => {
+  const { data } = await api.get(`/players/${id}/stats`)
+  return data
 }

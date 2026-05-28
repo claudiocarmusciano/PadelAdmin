@@ -5,6 +5,7 @@ import { LayoutGrid, ChevronDown, ChevronUp, ArrowRightLeft } from 'lucide-react
 import { getZones, generateZones, swapPairs } from '@/api/pairs'
 import { getZoneStandings } from '@/api/matches'
 import { apiErrorMessage } from '@/lib/axios'
+import { useAuth } from '@/contexts/AuthContext'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -89,6 +90,7 @@ function PairRow({
   tournamentId: number
   onMoved: () => void
 }) {
+  const { isAdmin } = useAuth()
   const [targetPairId, setTargetPairId] = useState<string>('')
   const [showSelect, setShowSelect] = useState(false)
 
@@ -114,14 +116,16 @@ function PairRow({
       <span className="text-muted-foreground text-xs shrink-0" title="Puntos de ranking">{pair.totalPoints} ranking</span>
 
       {!showSelect ? (
-        <button
-          onClick={() => canSwap && setShowSelect(true)}
-          className={`transition-colors shrink-0 ${canSwap ? 'text-muted-foreground hover:text-primary cursor-pointer' : 'text-muted-foreground/30 cursor-not-allowed'}`}
-          title={canSwap ? 'Intercambiar con pareja de otra zona' : 'No hay parejas en otras zonas'}
-          disabled={!canSwap}
-        >
-          <ArrowRightLeft size={13} />
-        </button>
+        isAdmin && (
+          <button
+            onClick={() => canSwap && setShowSelect(true)}
+            className={`transition-colors shrink-0 ${canSwap ? 'text-muted-foreground hover:text-primary cursor-pointer' : 'text-muted-foreground/30 cursor-not-allowed'}`}
+            title={canSwap ? 'Intercambiar con pareja de otra zona' : 'No hay parejas en otras zonas'}
+            disabled={!canSwap}
+          >
+            <ArrowRightLeft size={13} />
+          </button>
+        )
       ) : (
         <div className="flex items-center gap-1 shrink-0">
           <Select value={targetPairId} onValueChange={setTargetPairId}>
@@ -165,6 +169,7 @@ function PairRow({
 
 export default function ZonesTab({ tournamentId }: Props) {
   const qc = useQueryClient()
+  const { isAdmin } = useAuth()
   const [expandedZones, setExpandedZones] = useState<Set<number>>(new Set())
 
   function toggleZone(id: number) {
@@ -204,10 +209,12 @@ export default function ZonesTab({ tournamentId }: Props) {
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-4">
-        <Button onClick={() => generateMut.mutate()} disabled={generateMut.isPending}>
-          <LayoutGrid size={15} className="mr-1.5" />
-          {zones.length > 0 ? 'Regenerar zonas' : 'Generar zonas'}
-        </Button>
+        {isAdmin && (
+          <Button onClick={() => generateMut.mutate()} disabled={generateMut.isPending}>
+            <LayoutGrid size={15} className="mr-1.5" />
+            {zones.length > 0 ? 'Regenerar zonas' : 'Generar zonas'}
+          </Button>
+        )}
         <p className="text-xs text-muted-foreground">
           Zonas de 3 parejas (las primeras pueden ser de 4). Mín. 9 parejas. Distribución snake por puntos.
         </p>

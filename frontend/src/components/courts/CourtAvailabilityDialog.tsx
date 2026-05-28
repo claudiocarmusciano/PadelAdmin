@@ -1,0 +1,248 @@
+import { useEffect, useState } from 'react'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { toast } from 'sonner'
+import { Clock, Copy } from 'lucide-react'
+
+import {
+  getCourtAvailability,
+  upsertCourtAvailability,
+  deleteCourtAvailability,
+  type CourtAvailability,
+} from '@/api/courtAvailability'
+import { apiErrorMessage } from '@/lib/axios'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
+import { Button } from '@/components/ui/button'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+
+// Horas seleccionables — cada 30 minutos de 06:00 a 23:30
+const TIME_OPTIONS: string[] = (() => {
+  const out: string[] = []
+  for (let h = 6; h <= 23; h++) {
+    out.push(`${String(h).padStart(2, '0')}:00`)
+    out.push(`${String(h).padStart(2, '0')}:30`)
+  }
+  return out
+})()
+
+// El backend usa 0=Lunes ... 6=Domingo
+const DAYS = [
+  { value: 0, label: 'Lunes' },
+  { value: 1, label: 'Martes' },
+  { value: 2, label: 'Miércoles' },
+  { value: 3, label: 'Jueves' },
+  { value: 4, label: 'Viernes' },
+  { value: 5, label: 'Sábado' },
+  { value: 6, label: 'Domingo' },
+]
+
+interface DayRow {
+  enabled: boolean
+  openTime: string  // "HH:mm"
+  closeTime: string // "HH:mm"
+  existingId?: number
+}
+
+const emptyRow: DayRow = { enabled: false, openTime: '16:00', closeTime: '23:00' }
+
+interface Props {
+  courtId: number | null
+  courtName?: string
+  onClose: () => void
+}
+
+function hhmm(t: string) {
+  return (t ?? '').slice(0, 5)
+}
+
+export function CourtAvailabilityDialog({ courtId, courtName, onClose }: Props) {
+  const qc = useQueryClient()
+  const [rows, setRows] = useState<DayRow[]>(() => DAYS.map(() => ({ ...emptyRow })))
+
+  const { data, isLoading } = useQuery({
+    queryKey: ['courtAvailability', courtId],
+    queryFn: () => getCourtAvailability(courtId!),
+    enabled: courtId !== null,
+  })
+
+  // Sincronizar estado local con la data del backend (solo cuando llega data real)
+  useEffect(() => {
+    if (!courtId || !data) return
+    const byDay = new Map<number, CourtAvailability>()
+    data.forEach((a) => byDay.set(a.dayOfWeek, a))
+    setRows(DAYS.map(({ value }) => {
+      const found = byDay.get(value)
+      return found
+        ? { enabled: true, openTime: hhmm(found.openTime), closeTime: hhmm(found.closeTime), existingId: found.id }
+        : { ...emptyRow }
+    }))
+  }, [data, courtId])
+
+  // Cuando se abre el dialog (cambia courtId) y aún no llegaron datos: estado limpio
+  useEffect(() => {
+    if (courtId === null) return
+    setRows(DAYS.map(() => ({ ...emptyRow })))
+  }, [courtId])
+
+  const upsertMut = useMutation({
+    mutationFn: (args: { dayOfWeek: number; openTime: string; closeTime: string }) =>
+      upsertCourtAvailability(courtId!, args),
+  })
+
+  const deleteMut = useMutation({
+    mutationFn: (availabilityId: number) =>
+      deleteCourtAvailability(courtId!, availabilityId),
+  })
+
+  function updateRow(idx: number, partial: Partial<DayRow>) {
+    setRows((prev) => prev.map((r, i) => (i === idx ? { ...r, ...partial } : r)))
+  }
+
+  /** Aplica los valores del primer día habilitado a todos los demás (atajo). */
+  function copyToAll() {
+    const source = rows.find((r) => r.enabled)
+    if (!source) {
+      toast.error('Activá al menos un día para copiarlo a los demás')
+      return
+    }
+    setRows((prev) => prev.map((r) => ({ ...r, enabled: true, openTime: source.openTime, closeTime: source.closeTime })))
+    toast.success('Aplicado a todos los días')
+  }
+
+  async function handleSave() {
+    if (!courtId) return
+    // Validar
+    for (let i = 0; i < rows.length; i++) {
+      const r = rows[i]
+      if (r.enabled && r.openTime >= r.closeTime) {
+        toast.error(`${DAYS[i].label}: la apertura debe ser antes del cierre`)
+        return
+      }
+    }
+
+    try {
+      const tasks: Promise<unknown>[] = []
+      for (let i = 0; i < rows.length; i++) {
+        const r = rows[i]
+        if (r.enabled) {
+          tasks.push(upsertMut.mutateAsync({
+            dayOfWeek: DAYS[i].value,
+            openTime: r.openTime + ':00',
+            closeTime: r.closeTime + ':00',
+          }))
+        } else if (r.existingId) {
+          // Había un registro y ahora se deshabilitó → borrar
+          tasks.push(deleteMut.mutateAsync(r.existingId))
+        }
+      }
+      await Promise.all(tasks)
+      await qc.invalidateQueries({ queryKey: ['courtAvailability', courtId] })
+      toast.success('Horarios guardados')
+      onClose()
+    } catch (e) {
+      toast.error(apiErrorMessage(e, 'Error al guardar los horarios'))
+    }
+  }
+
+  const enabledCount = rows.filter((r) => r.enabled).length
+
+  return (
+    <Dialog open={courtId !== null} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-xl">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Clock size={18} className="text-primary" />
+            Horarios — {courtName ?? 'Cancha'}
+          </DialogTitle>
+        </DialogHeader>
+        <div className="space-y-2 py-2">
+          <div className="flex items-center justify-between mb-2 gap-2">
+            <p className="text-xs text-muted-foreground flex-1 min-w-0">
+              Activá los días en que la cancha está disponible para torneos
+            </p>
+            <Button size="sm" variant="ghost" className="h-7 text-xs shrink-0" onClick={copyToAll}>
+              <Copy size={12} className="mr-1" />
+              Copiar a todos
+            </Button>
+          </div>
+          {isLoading ? (
+            <p className="text-sm text-muted-foreground py-8 text-center">Cargando...</p>
+          ) : (
+            <div className="space-y-1.5">
+              {DAYS.map(({ value, label }, idx) => {
+                const r = rows[idx]
+                return (
+                  <div
+                    key={value}
+                    className={`flex items-center gap-2 px-2.5 py-2 rounded-md border ${
+                      r.enabled ? 'border-primary/40 bg-primary/5' : 'border-border bg-background'
+                    }`}
+                  >
+                    <label className="flex items-center gap-1.5 cursor-pointer w-[88px] shrink-0">
+                      <input
+                        type="checkbox"
+                        checked={r.enabled}
+                        onChange={(e) => updateRow(idx, { enabled: e.target.checked })}
+                        className="h-4 w-4 accent-primary cursor-pointer shrink-0"
+                      />
+                      <span className="text-sm font-medium truncate">{label}</span>
+                    </label>
+                    <div className="flex-1 min-w-0 flex items-center gap-1.5">
+                      <Select
+                        value={r.openTime}
+                        onValueChange={(v) => updateRow(idx, { openTime: v })}
+                        disabled={!r.enabled}
+                      >
+                        <SelectTrigger className="h-8 text-sm min-w-0 flex-1 px-2 tabular-nums">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {TIME_OPTIONS.map((t) => (
+                            <SelectItem key={t} value={t}>{t}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <span className="text-xs text-muted-foreground shrink-0">a</span>
+                      <Select
+                        value={r.closeTime}
+                        onValueChange={(v) => updateRow(idx, { closeTime: v })}
+                        disabled={!r.enabled}
+                      >
+                        <SelectTrigger className="h-8 text-sm min-w-0 flex-1 px-2 tabular-nums">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {TIME_OPTIONS.map((t) => (
+                            <SelectItem key={t} value={t}>{t}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+          <p className="text-[10px] text-muted-foreground pt-2">
+            {enabledCount === 0
+              ? '⚠️ Sin horarios la cancha no se podrá usar en ningún fixture'
+              : `${enabledCount} día${enabledCount === 1 ? '' : 's'} habilitado${enabledCount === 1 ? '' : 's'}`}
+          </p>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>Cancelar</Button>
+          <Button onClick={handleSave} disabled={upsertMut.isPending || deleteMut.isPending}>
+            Guardar horarios
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+/** Helper: chequea si una lista de canchas tienen al menos 1 día configurado. */
+export async function getCourtsMissingAvailability(courtIds: number[]): Promise<number[]> {
+  const results = await Promise.all(
+    courtIds.map(async (id) => ({ id, av: await getCourtAvailability(id) }))
+  )
+  return results.filter((r) => r.av.length === 0).map((r) => r.id)
+}

@@ -1,11 +1,12 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { CalendarDays, Play, Clock, CheckCircle, XCircle, AlertCircle, Pencil } from 'lucide-react'
+import { CalendarDays, Play, Clock, CheckCircle, XCircle, AlertCircle, Pencil, Check, AlertTriangle } from 'lucide-react'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 
 import { getFixture, generateFixture, schedulePending, setZoneDays } from '@/api/tournaments'
+import { useAuth } from '@/contexts/AuthContext'
 import { apiErrorMessage } from '@/lib/axios'
 import { recordResult, updateResult, updateMatchCourt, getComplexesWithCourts } from '@/api/matches'
 import type { ComplexWithCourts, MatchResponse, MatchStatus } from '@/types'
@@ -383,6 +384,7 @@ function MatchCard({
   onResult: (m: MatchResponse) => void
   onCourt: (m: MatchResponse) => void
 }) {
+  const { isAdmin } = useAuth()
   const isPlayed = match.status === 'PLAYED'
   const pair1Won = isPlayed && match.winnerPairId === match.pair1?.id
   const pair2Won = isPlayed && match.winnerPairId === match.pair2?.id
@@ -454,28 +456,30 @@ function MatchCard({
             )}
           </div>
 
-          <div className="flex flex-col md:flex-col gap-1.5 shrink-0">
-            {(match.status === 'SCHEDULED' || match.status === 'CONFIRMED' || match.status === 'PENDING') && match.pair1 && match.pair2 && (
-              <Button size="sm" variant="outline" onClick={() => onResult(match)} className="text-xs md:text-sm">
-                <Play size={13} className="mr-1" />
-                <span className="hidden md:inline">Resultado</span>
-                <span className="md:hidden">Res.</span>
-              </Button>
-            )}
-            {match.status === 'PLAYED' && (
-              <Button size="sm" variant="ghost" className="text-xs text-muted-foreground" onClick={() => onResult(match)}>
-                <Pencil size={12} className="mr-1" />
-                Ed.
-              </Button>
-            )}
-            {match.status !== 'PLAYED' && match.status !== 'CANCELLED' && (
-              <Button size="sm" variant="ghost" className="text-xs text-muted-foreground" onClick={() => onCourt(match)}>
-                <Pencil size={12} className="mr-1" />
-                <span className="hidden md:inline">{match.courtName ? 'Cambiar cancha' : 'Asignar cancha'}</span>
-                <span className="md:hidden">Cancha</span>
-              </Button>
-            )}
-          </div>
+          {isAdmin && (
+            <div className="flex flex-col md:flex-col gap-1.5 shrink-0">
+              {(match.status === 'SCHEDULED' || match.status === 'CONFIRMED' || match.status === 'PENDING') && match.pair1 && match.pair2 && (
+                <Button size="sm" variant="outline" onClick={() => onResult(match)} className="text-xs md:text-sm">
+                  <Play size={13} className="mr-1" />
+                  <span className="hidden md:inline">Resultado</span>
+                  <span className="md:hidden">Res.</span>
+                </Button>
+              )}
+              {match.status === 'PLAYED' && (
+                <Button size="sm" variant="ghost" className="text-xs text-muted-foreground" onClick={() => onResult(match)}>
+                  <Pencil size={12} className="mr-1" />
+                  Ed.
+                </Button>
+              )}
+              {match.status !== 'PLAYED' && match.status !== 'CANCELLED' && (
+                <Button size="sm" variant="ghost" className="text-xs text-muted-foreground" onClick={() => onCourt(match)}>
+                  <Pencil size={12} className="mr-1" />
+                  <span className="hidden md:inline">{match.courtName ? 'Cambiar cancha' : 'Asignar cancha'}</span>
+                  <span className="md:hidden">Cancha</span>
+                </Button>
+              )}
+            </div>
+          )}
         </div>
       </CardContent>
     </Card>
@@ -486,11 +490,24 @@ function MatchCard({
 
 export default function FixtureTab({ tournamentId, startDate, endDate, zoneDays }: Props) {
   const qc = useQueryClient()
+  const { isAdmin } = useAuth()
   const [resultMatch, setResultMatch] = useState<MatchResponse | null>(null)
   const [courtMatch, setCourtMatch] = useState<MatchResponse | null>(null)
   const [selectedDays, setSelectedDays] = useState<number[]>(zoneDays)
 
   const availableDays = daysInRange(startDate, endDate)
+
+  // Sincronizar el estado local cuando llega data fresca del backend (después de guardar)
+  useEffect(() => {
+    setSelectedDays([...zoneDays].sort((a, b) => a - b))
+  }, [zoneDays])
+
+  // Estado: ¿hay cambios sin guardar?
+  const sortedSelected = [...selectedDays].sort((a, b) => a - b).join(',')
+  const sortedSaved = [...zoneDays].sort((a, b) => a - b).join(',')
+  const zoneDaysDirty = sortedSelected !== sortedSaved
+  const zoneDaysEmpty = selectedDays.length === 0
+  const zoneDaysReady = !zoneDaysDirty && !zoneDaysEmpty
 
   function toggleDay(d: number) {
     setSelectedDays((prev) =>
@@ -545,49 +562,93 @@ export default function FixtureTab({ tournamentId, startDate, endDate, zoneDays 
 
   return (
     <div className="space-y-4">
-      {/* Selector de días */}
-      <div className="flex items-start gap-4 flex-wrap border rounded-lg p-3 bg-card">
-        <div>
-          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">
-            Días en que se juegan los partidos de zona
-          </p>
-          <div className="flex gap-1.5 flex-wrap">
-            {ALL_DAYS.filter((d) => availableDays.includes(d.value)).map((d) => (
-              <button
-                key={d.value}
-                onClick={() => toggleDay(d.value)}
-                className={`px-3 py-1 rounded-md text-sm font-medium border transition-colors ${
-                  selectedDays.includes(d.value)
-                    ? 'bg-primary text-primary-foreground border-primary'
-                    : 'bg-transparent text-muted-foreground border-border hover:border-primary/50'
-                }`}
-              >
-                {d.label}
-              </button>
-            ))}
+      {/* Selector de días (solo admin) */}
+      {isAdmin && (
+        <div className={`flex items-start gap-4 flex-wrap border rounded-lg p-3 bg-card transition-colors ${
+          zoneDaysEmpty ? 'border-amber-500/40' : zoneDaysDirty ? 'border-primary/50' : 'border-border'
+        }`}>
+          <div className="flex-1 min-w-0">
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">
+              Días en que se juegan los partidos de zona
+            </p>
+            <div className="flex gap-1.5 flex-wrap">
+              {ALL_DAYS.filter((d) => availableDays.includes(d.value)).map((d) => (
+                <button
+                  key={d.value}
+                  onClick={() => toggleDay(d.value)}
+                  className={`px-3 py-1 rounded-md text-sm font-medium border transition-colors ${
+                    selectedDays.includes(d.value)
+                      ? 'bg-primary text-primary-foreground border-primary'
+                      : 'bg-transparent text-muted-foreground border-border hover:border-primary/50'
+                  }`}
+                >
+                  {d.label}
+                </button>
+              ))}
+            </div>
+            {/* Indicador de estado */}
+            <div className="mt-2 text-xs flex items-center gap-1.5">
+              {zoneDaysEmpty ? (
+                <>
+                  <AlertTriangle size={12} className="text-amber-400" />
+                  <span className="text-amber-400">Seleccioná al menos un día antes de generar el fixture</span>
+                </>
+              ) : zoneDaysDirty ? (
+                <>
+                  <AlertCircle size={12} className="text-primary" />
+                  <span className="text-primary">Cambios sin guardar — presioná "Guardar días"</span>
+                </>
+              ) : (
+                <>
+                  <Check size={12} className="text-emerald-400" />
+                  <span className="text-emerald-400">Días guardados</span>
+                </>
+              )}
+            </div>
           </div>
+          <Button
+            size="sm"
+            variant={zoneDaysDirty && !zoneDaysEmpty ? 'default' : 'outline'}
+            className="mt-5 shrink-0"
+            onClick={() => zoneDaysMut.mutate()}
+            disabled={zoneDaysMut.isPending || zoneDaysEmpty || !zoneDaysDirty}
+          >
+            {zoneDaysReady ? (
+              <>
+                <Check size={14} className="mr-1.5 text-emerald-400" />
+                Guardado
+              </>
+            ) : (
+              'Guardar días'
+            )}
+          </Button>
         </div>
-        <Button
-          size="sm"
-          variant="outline"
-          className="mt-5"
-          onClick={() => zoneDaysMut.mutate()}
-          disabled={zoneDaysMut.isPending}
-        >
-          Guardar días
-        </Button>
-      </div>
+      )}
 
       <div className="flex items-center gap-2 flex-wrap">
-        <Button onClick={() => generateMut.mutate()} disabled={generateMut.isPending}>
-          <CalendarDays size={15} className="mr-1.5" />
-          Generar fixture
-        </Button>
-        {fixture && fixture.pendingCount > 0 && (
-          <Button variant="outline" onClick={() => scheduleMut.mutate()} disabled={scheduleMut.isPending}>
-            <Clock size={15} className="mr-1.5" />
-            Programar pendientes ({fixture.pendingCount})
-          </Button>
+        {isAdmin && (
+          <>
+            <Button
+              onClick={() => generateMut.mutate()}
+              disabled={generateMut.isPending || !zoneDaysReady}
+              title={
+                zoneDaysEmpty
+                  ? 'Seleccioná y guardá los días de zona antes de generar el fixture'
+                  : zoneDaysDirty
+                    ? 'Hay cambios sin guardar en los días de zona'
+                    : undefined
+              }
+            >
+              <CalendarDays size={15} className="mr-1.5" />
+              Generar fixture
+            </Button>
+            {fixture && fixture.pendingCount > 0 && (
+              <Button variant="outline" onClick={() => scheduleMut.mutate()} disabled={scheduleMut.isPending}>
+                <Clock size={15} className="mr-1.5" />
+                Programar pendientes ({fixture.pendingCount})
+              </Button>
+            )}
+          </>
         )}
         {fixture && (
           <span className="text-sm text-muted-foreground">

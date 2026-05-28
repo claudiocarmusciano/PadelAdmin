@@ -4,6 +4,7 @@ import { toast } from 'sonner'
 import { Plus, Pencil, Trash2, Tag } from 'lucide-react'
 import { getCategories, createCategory, updateCategory, deleteCategory } from '@/api/categories'
 import { apiErrorMessage } from '@/lib/axios'
+import { useAuth } from '@/contexts/AuthContext'
 import type { Category } from '@/types'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -17,6 +18,7 @@ const defaultForm: CategoryForm = { name: '', description: '' }
 
 export default function CategoriesPage() {
   const qc = useQueryClient()
+  const { isAdmin } = useAuth()
   const [open, setOpen] = useState(false)
   const [editing, setEditing] = useState<Category | null>(null)
   const [form, setForm] = useState<CategoryForm>(defaultForm)
@@ -92,10 +94,12 @@ export default function CategoriesPage() {
           <h1 className="text-2xl font-bold">Categorías</h1>
           <p className="text-muted-foreground text-sm">Categorías de jugadores y torneos</p>
         </div>
-        <Button onClick={() => handleOpen()}>
-          <Plus size={16} className="mr-2" />
-          Nueva categoría
-        </Button>
+        {isAdmin && (
+          <Button onClick={() => handleOpen()}>
+            <Plus size={16} className="mr-2" />
+            Nueva categoría
+          </Button>
+        )}
       </div>
 
       {isLoading ? (
@@ -105,10 +109,12 @@ export default function CategoriesPage() {
           <CardContent className="flex flex-col items-center justify-center py-16 gap-3">
             <Tag size={40} className="text-muted-foreground" />
             <p className="font-medium">No hay categorías</p>
-            <Button onClick={() => handleOpen()}>
-              <Plus size={16} className="mr-2" />
-              Nueva categoría
-            </Button>
+            {isAdmin && (
+              <Button onClick={() => handleOpen()}>
+                <Plus size={16} className="mr-2" />
+                Nueva categoría
+              </Button>
+            )}
           </CardContent>
         </Card>
       ) : (
@@ -122,20 +128,22 @@ export default function CategoriesPage() {
                     <p className="text-xs text-muted-foreground">{c.description}</p>
                   )}
                 </div>
-                <div className="flex gap-1">
-                  <Button size="sm" variant="ghost" onClick={() => handleOpen(c)}>
-                    <Pencil size={14} />
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => {
-                      if (confirm(`¿Eliminar categoría "${c.name}"?`)) deleteMut.mutate(c.id)
-                    }}
-                  >
-                    <Trash2 size={14} className="text-destructive" />
-                  </Button>
-                </div>
+                {isAdmin && (
+                  <div className="flex gap-1">
+                    <Button size="sm" variant="ghost" onClick={() => handleOpen(c)}>
+                      <Pencil size={14} />
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => {
+                        if (confirm(`¿Eliminar categoría "${c.name}"?`)) deleteMut.mutate(c.id)
+                      }}
+                    >
+                      <Trash2 size={14} className="text-destructive" />
+                    </Button>
+                  </div>
+                )}
               </CardContent>
             </Card>
           ))}
