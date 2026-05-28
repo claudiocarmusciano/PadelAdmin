@@ -30,4 +30,11 @@ public interface MatchRepository extends JpaRepository<Match, Long> {
             """)
     List<Match> findByPairAndTournament(@Param("pairId") Long pairId,
                                         @Param("tournamentId") Long tournamentId);
+
+    /** Todos los matches en los que participó cualquiera de las parejas dadas. */
+    @Query("""
+            SELECT m FROM Match m
+            WHERE m.pair1.id IN :pairIds OR m.pair2.id IN :pairIds
+            """)
+    List<Match> findByPairIdIn(@Param("pairIds") List<Long> pairIds);
 }

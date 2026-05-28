@@ -94,6 +94,18 @@ public class FixtureService {
 
         // 5. Generar slots válidos
         List<TimeSlot> slots = generateTimeSlots(tournament, courts, availabilityByCourtId, buffers);
+        // Si no hay ningún slot disponible, no tiene sentido seguir: avisar al usuario.
+        if (slots.isEmpty()) {
+            // Verificar la causa más común: canchas sin availability
+            boolean noAvailability = availabilityByCourtId.values().stream().allMatch(List::isEmpty);
+            String msg = noAvailability
+                    ? "Las canchas del complejo \"" + tournament.getComplex().getName()
+                        + "\" no tienen horarios de disponibilidad configurados. "
+                        + "Configurá los horarios de las canchas antes de generar el fixture."
+                    : "No hay slots disponibles para programar los partidos. "
+                        + "Revisá las fechas del torneo, los días de zona y los horarios de las canchas.";
+            throw new BusinessException(msg);
+        }
         // Ordenar por fecha+hora antes que por cancha: así el scheduler ofrece
         // TODAS las canchas en la misma franja horaria antes de pasar a la siguiente,
         // logrando que los partidos se distribuyan entre canchas simultáneamente.
@@ -265,20 +277,49 @@ public class FixtureService {
         // Partidos ya programados/jugados actúan como restricciones de ocupación
         List<Match> scheduled = new ArrayList<>(alreadyScheduled);
 
-        for (Match match : matches) {
+        // Ordenar partidos por "restrictedness": los con menos slots compatibles primero.
+        // Así los más restringidos toman los pocos slots que pueden usar antes que partidos
+        // flexibles "se coman" esos slots y los obliguen a violar preferencias.
+        List<Match> ordered = new ArrayList<>(matches);
+        ordered.sort(Comparator.comparingInt(
+                m -> countCompatibleSlots(m, slots, constraintsByPairId)
+        ));
+
+        // Log del orden y restrictedness — útil para debug
+        log.info("📋 Orden de procesamiento (más restringidos primero):");
+        for (Match m : ordered) {
+            int compat = countCompatibleSlots(m, slots, constraintsByPairId);
+            Long p1 = m.getPair1().getId();
+            Long p2 = m.getPair2() != null ? m.getPair2().getId() : null;
+            log.info("   • pareja {} vs pareja {} → {} slots compatibles", p1, p2, compat);
+        }
+
+        // Stats de diagnóstico
+        int satisfiedWithPrefs = 0;
+        int relaxedFromPrefs = 0;
+        int unscheduled = 0;
+
+        for (Match match : ordered) {
             TimeSlot chosen = null;
+            boolean fromPreferences = false;
+            Long p1id = match.getPair1().getId();
+            Long p2id = match.getPair2() != null ? match.getPair2().getId() : null;
+            boolean matchHasPrefs = hasAnyPreference(match, constraintsByPairId);
 
             // Pasada 1: intenta respetar preferencias (soft constraints ON)
             for (TimeSlot slot : slots) {
                 if (isValidSlot(match, slot, scheduled, tournament, constraintsByPairId, true)) {
                     chosen = slot;
+                    fromPreferences = true;
                     break;
                 }
             }
 
             // Pasada 2: si no encontró, relaja preferencias (solo hard constraints)
             if (chosen == null) {
-                log.debug("Match {}: no hay slot con preferencias, relajando...", match);
+                if (matchHasPrefs) {
+                    log.warn("   ⚠ match pareja {} vs pareja {} no encontró slot en preferencias, relajando...", p1id, p2id);
+                }
                 for (TimeSlot slot : slots) {
                     if (isValidSlot(match, slot, scheduled, tournament, constraintsByPairId, false)) {
                         chosen = slot;
@@ -293,12 +334,71 @@ public class FixtureService {
                 match.setCourt(courtMap.get(chosen.getCourtId()));
                 match.setStatus(MatchStatus.SCHEDULED);
                 scheduled.add(match);
+                if (fromPreferences) {
+                    satisfiedWithPrefs++;
+                } else if (hasAnyPreference(match, constraintsByPairId)) {
+                    relaxedFromPrefs++;
+                    log.warn("⚠ Preferencia NO respetada — match pareja {} vs pareja {} → programado {} {} (fuera de las preferencias de las parejas)",
+                            match.getPair1().getId(),
+                            match.getPair2() != null ? match.getPair2().getId() : "BYE",
+                            chosen.getDate(), chosen.getStartTime());
+                } else {
+                    satisfiedWithPrefs++; // partido sin preferencias = no se violó nada
+                }
             } else {
+                unscheduled++;
                 log.warn("No se pudo programar el partido entre pareja {} y pareja {}",
                         match.getPair1().getId(),
                         match.getPair2() != null ? match.getPair2().getId() : "BYE");
             }
         }
+
+        log.info("Scheduling: {} respetando preferencias · {} con preferencia relajada · {} pendientes",
+                satisfiedWithPrefs, relaxedFromPrefs, unscheduled);
+    }
+
+    /**
+     * Cuenta cuántos slots del calendario son compatibles con las constraints
+     * (restricciones + preferencias) de las parejas del match. Ignora ocupación
+     * de otros partidos — solo mira las constraints del match en sí.
+     *
+     * Sirve como heurística de "restrictedness": menor número = partido más restringido =
+     * debe procesarse primero.
+     */
+    private int countCompatibleSlots(Match match, List<TimeSlot> allSlots,
+                                      Map<Long, List<PairScheduleConstraint>> constraintsByPairId) {
+        if (match.getPhase() != MatchPhase.ZONE) return allSlots.size();
+
+        Long pair1Id = match.getPair1().getId();
+        Long pair2Id = match.getPair2() != null ? match.getPair2().getId() : null;
+        List<PairScheduleConstraint> c1 = constraintsByPairId.getOrDefault(pair1Id, List.of());
+        List<PairScheduleConstraint> c2 = pair2Id != null
+                ? constraintsByPairId.getOrDefault(pair2Id, List.of())
+                : List.of();
+
+        boolean p1HasPrefs = hasPreferences(c1);
+        boolean p2HasPrefs = hasPreferences(c2);
+
+        int count = 0;
+        for (TimeSlot slot : allSlots) {
+            if (violatesRestriction(slot, c1)) continue;
+            if (violatesRestriction(slot, c2)) continue;
+            if (p1HasPrefs && !satisfiesPreference(slot, c1)) continue;
+            if (p2HasPrefs && !satisfiesPreference(slot, c2)) continue;
+            count++;
+        }
+        return count;
+    }
+
+    /** True si alguna pareja del match tiene al menos una preferencia. */
+    private boolean hasAnyPreference(Match match,
+                                      Map<Long, List<PairScheduleConstraint>> constraintsByPairId) {
+        if (match.getPhase() != MatchPhase.ZONE) return false;
+        Long pair1Id = match.getPair1().getId();
+        Long pair2Id = match.getPair2() != null ? match.getPair2().getId() : null;
+        if (hasPreferences(constraintsByPairId.getOrDefault(pair1Id, List.of()))) return true;
+        if (pair2Id != null && hasPreferences(constraintsByPairId.getOrDefault(pair2Id, List.of()))) return true;
+        return false;
     }
 
     private boolean isValidSlot(Match match,
@@ -401,11 +501,16 @@ public class FixtureService {
 
     private boolean satisfiesPreference(TimeSlot slot, List<PairScheduleConstraint> constraints) {
         int dow = slot.getDate().getDayOfWeek().getValue(); // 1=Lun … 7=Dom (igual que el frontend)
+        // El slot debe estar COMPLETAMENTE contenido dentro de la franja de preferencia.
+        // (Si solo overlapea parcialmente, parte del partido cae fuera del horario preferido,
+        // y eso NO es lo que esperan los jugadores.)
         return constraints.stream()
                 .filter(c -> c.getConstraintType() == ConstraintType.PREFERENCE)
                 .filter(c -> c.getDayOfWeek().equals(dow))
-                .anyMatch(c -> timesOverlap(c.getSlotStart(), c.getSlotEnd(),
-                        slot.getStartTime(), slot.getEndTime()));
+                .anyMatch(c ->
+                        !slot.getStartTime().isBefore(c.getSlotStart()) &&  // slot.start >= pref.start
+                        !slot.getEndTime().isAfter(c.getSlotEnd())          // slot.end   <= pref.end
+                );
     }
 
     private boolean timesOverlap(LocalTime start1, LocalTime end1, LocalTime start2, LocalTime end2) {
@@ -461,6 +566,14 @@ public class FixtureService {
                 ));
         List<TournamentBuffer> buffers = bufferRepository.findByTournamentIdOrderByDayOfWeek(tournamentId);
         List<TimeSlot> slots = generateTimeSlots(tournament, courts, availabilityByCourtId, buffers);
+        if (slots.isEmpty()) {
+            boolean noAvailability = availabilityByCourtId.values().stream().allMatch(List::isEmpty);
+            String msg = noAvailability
+                    ? "Las canchas del complejo \"" + tournament.getComplex().getName()
+                        + "\" no tienen horarios de disponibilidad configurados."
+                    : "No hay slots disponibles para programar los partidos pendientes.";
+            throw new BusinessException(msg);
+        }
         slots.sort(Comparator
                 .comparing(TimeSlot::getDate)
                 .thenComparing(TimeSlot::getStartTime)

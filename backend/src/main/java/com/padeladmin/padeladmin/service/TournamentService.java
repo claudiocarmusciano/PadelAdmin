@@ -8,17 +8,21 @@ import com.padeladmin.padeladmin.entity.Tournament;
 import com.padeladmin.padeladmin.enums.TournamentStatus;
 import com.padeladmin.padeladmin.exception.BusinessException;
 import com.padeladmin.padeladmin.exception.ResourceNotFoundException;
+import com.padeladmin.padeladmin.repository.AvailabilityWindowRepository;
 import com.padeladmin.padeladmin.repository.CategoryRepository;
 import com.padeladmin.padeladmin.repository.ComplexRepository;
 import com.padeladmin.padeladmin.repository.MatchRepository;
 import com.padeladmin.padeladmin.repository.TournamentRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.util.List;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
@@ -28,6 +32,8 @@ public class TournamentService {
     private final CategoryRepository categoryRepository;
     private final ComplexRepository complexRepository;
     private final MatchRepository matchRepository;
+    private final AvailabilityWindowRepository availabilityWindowRepository;
+    private final JdbcTemplate jdbcTemplate;
 
     public List<TournamentResponseDto> findAll() {
         return tournamentRepository.findAllByOrderByCreatedAtDesc().stream()
@@ -139,7 +145,63 @@ public class TournamentService {
         if (tournament.getStatus() != TournamentStatus.DRAFT) {
             throw new BusinessException("Solo se pueden eliminar torneos en estado DRAFT");
         }
-        tournamentRepository.deleteById(id);
+
+        // Borrado robusto via SQL nativo en orden de dependencias (hoja → raíz).
+        // Evitamos depender de cascades JPA que pueden no estar configuradas correctamente
+        // en todas las entidades hijas. Todo dentro de la misma transacción.
+        log.info("Eliminando torneo {} \"{}\" y todas sus dependencias...", id, tournament.getName());
+
+        // Nivel 4: sets de partidos jugados
+        jdbcTemplate.update("""
+            DELETE FROM match_sets
+            WHERE match_result_id IN (
+                SELECT id FROM match_results
+                WHERE match_id IN (SELECT id FROM matches WHERE tournament_id = ?)
+            )
+            """, id);
+
+        // Nivel 3: resultados de partidos
+        jdbcTemplate.update("""
+            DELETE FROM match_results
+            WHERE match_id IN (SELECT id FROM matches WHERE tournament_id = ?)
+            """, id);
+
+        // Nivel 2: partidos
+        jdbcTemplate.update("DELETE FROM matches WHERE tournament_id = ?", id);
+
+        // Nivel 2: restricciones / preferencias horarias por pareja
+        jdbcTemplate.update("""
+            DELETE FROM pair_schedule_constraints
+            WHERE pair_id IN (SELECT id FROM pairs WHERE tournament_id = ?)
+            """, id);
+
+        // Nivel 2: jugadores en cada pareja
+        jdbcTemplate.update("""
+            DELETE FROM pair_players
+            WHERE pair_id IN (SELECT id FROM pairs WHERE tournament_id = ?)
+            """, id);
+
+        // Nivel 2: parejas en cada zona
+        jdbcTemplate.update("""
+            DELETE FROM zone_pairs
+            WHERE zone_id IN (SELECT id FROM zones WHERE tournament_id = ?)
+            """, id);
+
+        // Nivel 1: parejas y zonas del torneo
+        jdbcTemplate.update("DELETE FROM pairs WHERE tournament_id = ?", id);
+        jdbcTemplate.update("DELETE FROM zones WHERE tournament_id = ?", id);
+
+        // Nivel 1: buffers y días de zona
+        jdbcTemplate.update("DELETE FROM tournament_buffers WHERE tournament_id = ?", id);
+        jdbcTemplate.update("DELETE FROM tournament_zone_days WHERE tournament_id = ?", id);
+
+        // Nivel 1: ventanas de disponibilidad
+        jdbcTemplate.update("DELETE FROM availability_windows WHERE tournament_id = ?", id);
+
+        // Finalmente, el torneo
+        jdbcTemplate.update("DELETE FROM tournaments WHERE id = ?", id);
+
+        log.info("✓ Torneo {} eliminado", id);
     }
 
     private Tournament getOrThrow(Long id) {

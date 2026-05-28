@@ -4,7 +4,10 @@ import com.padeladmin.padeladmin.dto.player.PlayerCategoryPointsRequestDto;
 import com.padeladmin.padeladmin.dto.player.PlayerCategoryPointsResponseDto;
 import com.padeladmin.padeladmin.dto.player.PlayerRequestDto;
 import com.padeladmin.padeladmin.dto.player.PlayerResponseDto;
+import com.padeladmin.padeladmin.dto.player.PlayerStatsDto;
+import com.padeladmin.padeladmin.dto.player.PlayerWithCategoriesDto;
 import com.padeladmin.padeladmin.service.PlayerService;
+import com.padeladmin.padeladmin.service.PlayerStatsService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -19,6 +22,7 @@ import java.util.List;
 public class PlayerController {
 
     private final PlayerService playerService;
+    private final PlayerStatsService playerStatsService;
 
     @GetMapping
     public ResponseEntity<List<PlayerResponseDto>> findAll(
@@ -29,9 +33,21 @@ public class PlayerController {
         return ResponseEntity.ok(playerService.findAll());
     }
 
+    @GetMapping("/with-categories")
+    public ResponseEntity<List<PlayerWithCategoriesDto>> findAllWithCategories(
+            @RequestParam(required = false) Long categoryId,
+            @RequestParam(required = false) String search) {
+        return ResponseEntity.ok(playerService.findAllWithCategories(categoryId, search));
+    }
+
     @GetMapping("/{id}")
     public ResponseEntity<PlayerResponseDto> findById(@PathVariable Long id) {
         return ResponseEntity.ok(playerService.findById(id));
+    }
+
+    @GetMapping("/{id}/stats")
+    public ResponseEntity<PlayerStatsDto> getStats(@PathVariable Long id) {
+        return ResponseEntity.ok(playerStatsService.computeStats(id));
     }
 
     @PostMapping
