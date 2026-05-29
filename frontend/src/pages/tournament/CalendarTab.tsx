@@ -327,7 +327,11 @@ export default function CalendarTab({ tournamentId }: Props) {
   })
 
   const buckets = useMemo(() => buildBuckets(fixture?.matches ?? []), [fixture])
-  const pendingMatches = (fixture?.matches ?? []).filter((m) => !m.scheduledStart || !m.courtId)
+  const unscheduled = (fixture?.matches ?? []).filter((m) => !m.scheduledStart || !m.courtId)
+  // Falta programarlos (Ronda 2 recién creada, etc.) — excluye los ya jugados/cancelados
+  const pendingMatches = unscheduled.filter((m) => m.status !== 'PLAYED' && m.status !== 'CANCELLED')
+  // Ya se jugaron pero sin horario registrado (ej: Ronda 2 cargada directo sin programar)
+  const playedNoSchedule = unscheduled.filter((m) => m.status === 'PLAYED')
 
   if (isLoading) {
     return <p className="text-sm text-muted-foreground">Cargando calendario...</p>
@@ -372,12 +376,12 @@ export default function CalendarTab({ tournamentId }: Props) {
         ))}
       </div>
 
-      {/* Lista de pendientes (no aparecen en el grid) */}
+      {/* Lista de pendientes de programar (no aparecen en el grid) */}
       {pendingMatches.length > 0 && (
         <Card>
           <CardContent className="p-3 space-y-2">
             <h3 className="text-sm font-semibold flex items-center gap-2 text-amber-400">
-              <Clock size={13} /> Partidos pendientes ({pendingMatches.length})
+              <Clock size={13} /> Partidos pendientes de programar ({pendingMatches.length})
             </h3>
             <div className="space-y-1.5">
               {pendingMatches.map((m) => {
@@ -388,6 +392,33 @@ export default function CalendarTab({ tournamentId }: Props) {
                     key={m.id}
                     onClick={() => setSelected(m)}
                     className="w-full text-left text-xs px-2 py-1.5 rounded border border-amber-500/30 bg-amber-500/5 hover:bg-amber-500/10"
+                  >
+                    {m.zoneName && <span className="font-semibold mr-2">{m.zoneName}</span>}
+                    {p1} <span className="text-muted-foreground">vs</span> {p2}
+                  </button>
+                )
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Jugados sin horario registrado (ej: Ronda 2 cargada directo) */}
+      {playedNoSchedule.length > 0 && (
+        <Card>
+          <CardContent className="p-3 space-y-2">
+            <h3 className="text-sm font-semibold flex items-center gap-2 text-emerald-400">
+              <Clock size={13} /> Jugados sin horario registrado ({playedNoSchedule.length})
+            </h3>
+            <div className="space-y-1.5">
+              {playedNoSchedule.map((m) => {
+                const p1 = pairFullLabel(m.pair1)
+                const p2 = pairFullLabel(m.pair2)
+                return (
+                  <button
+                    key={m.id}
+                    onClick={() => setSelected(m)}
+                    className="w-full text-left text-xs px-2 py-1.5 rounded border border-emerald-500/30 bg-emerald-500/5 hover:bg-emerald-500/10"
                   >
                     {m.zoneName && <span className="font-semibold mr-2">{m.zoneName}</span>}
                     {p1} <span className="text-muted-foreground">vs</span> {p2}
