@@ -126,23 +126,23 @@ function PlayerCategoriesSection({ player }: { player: { id: number; firstName: 
           {playerPoints.map((pp: PlayerCategoryPoints) => (
             <div
               key={pp.categoryId}
-              className="flex items-center gap-1.5 bg-secondary rounded-md px-2.5 py-1.5"
+              className="flex items-center gap-1.5 bg-secondary rounded-md pl-2.5 pr-1 py-1"
             >
               <span className="text-xs font-medium">{pp.categoryName}</span>
               <Badge variant="outline" className="text-xs h-5 px-1.5">
                 {pp.points} pts
               </Badge>
               {isAdmin && (
-                <>
+                <div className="flex items-center gap-0.5 ml-1 pl-1 border-l border-border/60">
                   <button
-                    className="text-muted-foreground hover:text-primary transition-colors ml-0.5"
+                    className="flex items-center justify-center h-7 w-7 rounded-md text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
                     title="Editar puntos"
                     onClick={() => openEdit(pp)}
                   >
-                    <Pencil size={11} />
+                    <Pencil size={14} />
                   </button>
                   <button
-                    className="text-muted-foreground hover:text-destructive transition-colors"
+                    className="flex items-center justify-center h-7 w-7 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
                     title="Quitar categoría"
                     onClick={() => {
                       if (confirm(`¿Quitar ${pp.categoryName} de ${player.firstName}?`)) {
@@ -150,9 +150,9 @@ function PlayerCategoriesSection({ player }: { player: { id: number; firstName: 
                       }
                     }}
                   >
-                    <Trash2 size={11} />
+                    <Trash2 size={14} />
                   </button>
-                </>
+                </div>
               )}
             </div>
           ))}
