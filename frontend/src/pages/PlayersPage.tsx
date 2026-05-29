@@ -27,7 +27,8 @@ const defaultForm: PlayerRequest = {
 function PlayerCategoriesSection({ player }: { player: { id: number; firstName: string; lastName: string } }) {
   const qc = useQueryClient()
   const { isAdmin } = useAuth()
-  const [addOpen, setAddOpen] = useState(false)
+  const [dialogOpen, setDialogOpen] = useState(false)
+  const [editingCatId, setEditingCatId] = useState<number | null>(null) // null = modo agregar
   const [selectedCategoryId, setSelectedCategoryId] = useState('')
   const [points, setPoints] = useState('')
 
@@ -50,10 +51,8 @@ function PlayerCategoriesSection({ player }: { player: { id: number; firstName: 
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['playerPoints', player.id] })
       qc.invalidateQueries({ queryKey: ['playersWithCategories'] })
-      toast.success('Puntos guardados')
-      setAddOpen(false)
-      setSelectedCategoryId('')
-      setPoints('')
+      toast.success(editingCatId ? 'Puntos actualizados' : 'Puntos guardados')
+      closeDialog()
     },
     onError: (error) => toast.error(apiErrorMessage(error, 'Error al guardar los puntos')),
   })
@@ -71,6 +70,27 @@ function PlayerCategoriesSection({ player }: { player: { id: number; firstName: 
   const assignedCategoryIds = new Set(playerPoints.map((p: PlayerCategoryPoints) => p.categoryId))
   const availableCategories = categories.filter((c) => !assignedCategoryIds.has(c.id))
 
+  function openAdd() {
+    setEditingCatId(null)
+    setSelectedCategoryId('')
+    setPoints('')
+    setDialogOpen(true)
+  }
+
+  function openEdit(pp: PlayerCategoryPoints) {
+    setEditingCatId(pp.categoryId)
+    setSelectedCategoryId(String(pp.categoryId))
+    setPoints(String(pp.points))
+    setDialogOpen(true)
+  }
+
+  function closeDialog() {
+    setDialogOpen(false)
+    setEditingCatId(null)
+    setSelectedCategoryId('')
+    setPoints('')
+  }
+
   function handleSubmit() {
     if (!selectedCategoryId || points === '') {
       toast.error('Seleccioná categoría e ingresá los puntos')
@@ -79,6 +99,10 @@ function PlayerCategoriesSection({ player }: { player: { id: number; firstName: 
     upsertMut.mutate()
   }
 
+  const editingCategoryName = editingCatId
+    ? playerPoints.find((p: PlayerCategoryPoints) => p.categoryId === editingCatId)?.categoryName
+    : null
+
   return (
     <div className="px-4 pb-4 pt-3 space-y-2 border-t border-border">
       <div className="flex items-center justify-between">
@@ -86,7 +110,7 @@ function PlayerCategoriesSection({ player }: { player: { id: number; firstName: 
           Categorías y puntos
         </p>
         {isAdmin && availableCategories.length > 0 && (
-          <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setAddOpen(true)}>
+          <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={openAdd}>
             <Plus size={13} className="mr-1" />
             Agregar
           </Button>
@@ -109,54 +133,74 @@ function PlayerCategoriesSection({ player }: { player: { id: number; firstName: 
                 {pp.points} pts
               </Badge>
               {isAdmin && (
-                <button
-                  className="text-muted-foreground hover:text-destructive transition-colors ml-0.5"
-                  onClick={() => {
-                    if (confirm(`¿Quitar ${pp.categoryName} de ${player.firstName}?`)) {
-                      deleteMut.mutate(pp.categoryId)
-                    }
-                  }}
-                >
-                  <Trash2 size={11} />
-                </button>
+                <>
+                  <button
+                    className="text-muted-foreground hover:text-primary transition-colors ml-0.5"
+                    title="Editar puntos"
+                    onClick={() => openEdit(pp)}
+                  >
+                    <Pencil size={11} />
+                  </button>
+                  <button
+                    className="text-muted-foreground hover:text-destructive transition-colors"
+                    title="Quitar categoría"
+                    onClick={() => {
+                      if (confirm(`¿Quitar ${pp.categoryName} de ${player.firstName}?`)) {
+                        deleteMut.mutate(pp.categoryId)
+                      }
+                    }}
+                  >
+                    <Trash2 size={11} />
+                  </button>
+                </>
               )}
             </div>
           ))}
         </div>
       )}
 
-      <Dialog open={addOpen} onOpenChange={setAddOpen}>
+      <Dialog open={dialogOpen} onOpenChange={(o) => (o ? setDialogOpen(true) : closeDialog())}>
         <DialogContent className="max-w-xs">
           <DialogHeader>
-            <DialogTitle>Asignar categoría — {player.firstName} {player.lastName}</DialogTitle>
+            <DialogTitle>
+              {editingCatId
+                ? `Editar puntos — ${editingCategoryName}`
+                : `Asignar categoría — ${player.firstName} ${player.lastName}`}
+            </DialogTitle>
           </DialogHeader>
           <div className="grid gap-3 py-2">
             <div className="grid gap-1.5">
               <Label>Categoría</Label>
-              <Select value={selectedCategoryId} onValueChange={setSelectedCategoryId}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Seleccioná" />
-                </SelectTrigger>
-                <SelectContent>
-                  {availableCategories.map((c) => (
-                    <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              {editingCatId ? (
+                <Input value={editingCategoryName ?? ''} disabled />
+              ) : (
+                <Select value={selectedCategoryId} onValueChange={setSelectedCategoryId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Seleccioná" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableCategories.map((c) => (
+                      <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
             </div>
             <div className="grid gap-1.5">
               <Label>Puntos</Label>
               <Input
                 type="number"
                 min={0}
+                step={0.5}
                 value={points}
                 onChange={(e) => setPoints(e.target.value)}
                 placeholder="0"
+                autoFocus={!!editingCatId}
               />
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setAddOpen(false)}>Cancelar</Button>
+            <Button variant="outline" onClick={closeDialog}>Cancelar</Button>
             <Button onClick={handleSubmit} disabled={upsertMut.isPending}>Guardar</Button>
           </DialogFooter>
         </DialogContent>
