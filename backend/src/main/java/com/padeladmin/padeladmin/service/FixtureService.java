@@ -609,13 +609,22 @@ public class FixtureService {
                 .map(this::toMatchDto)
                 .toList();
 
-        long scheduledCount = matches.stream().filter(m -> m.getStatus() == MatchStatus.SCHEDULED).count();
+        // "Programados" = tienen slot asignado (SCHEDULED, CONFIRMED o ya PLAYED)
+        // "Pendientes"  = sin slot aún (PENDING) — solo estos necesitan ser programados
+        long scheduledCount = matches.stream()
+                .filter(m -> m.getStatus() == MatchStatus.SCHEDULED
+                          || m.getStatus() == MatchStatus.CONFIRMED
+                          || m.getStatus() == MatchStatus.PLAYED)
+                .count();
+        long pendingCount = matches.stream()
+                .filter(m -> m.getStatus() == MatchStatus.PENDING)
+                .count();
 
         return FixtureResponseDto.builder()
                 .tournamentId(tournamentId)
                 .totalMatches(matches.size())
                 .scheduledCount((int) scheduledCount)
-                .pendingCount(matches.size() - (int) scheduledCount)
+                .pendingCount((int) pendingCount)
                 .matches(matchDtos)
                 .build();
     }

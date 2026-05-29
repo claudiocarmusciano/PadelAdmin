@@ -111,11 +111,14 @@ export function ResultDialog({
       }
       return apiCall(match.id, { sets: allSets })
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       qc.invalidateQueries({ queryKey: ['fixture', tournamentId] })
       qc.invalidateQueries({ queryKey: ['bracket', tournamentId] })
       qc.invalidateQueries({ queryKey: ['standings'] })
       toast.success(isWalkover ? 'W.O. registrado' : isEdit ? 'Resultado actualizado' : 'Resultado cargado')
+      if (data?.round2Created) {
+        toast.info('Se generaron los partidos de Ronda 2 (ganadores vs ganadores · perdedores vs perdedores). Programalos con el botón "Programar Ronda 2".')
+      }
       onClose()
     },
     onError: (error) => toast.error(apiErrorMessage(error, isEdit ? 'Error al editar el resultado' : 'Error al cargar el resultado')),
@@ -540,11 +543,17 @@ export default function FixtureTab({ tournamentId, startDate, endDate, zoneDays 
 
   const scheduleMut = useMutation({
     mutationFn: () => schedulePending(tournamentId),
-    onSuccess: () => {
+    onSuccess: (data) => {
       qc.invalidateQueries({ queryKey: ['fixture', tournamentId] })
-      toast.success('Partidos pendientes programados')
+      const scheduled = data?.scheduledCount ?? 0
+      const pending = data?.pendingCount ?? 0
+      if (pending === 0) {
+        toast.success(`Ronda 2 programada — ${scheduled} partidos asignados`)
+      } else {
+        toast.warning(`${scheduled} partidos programados · ${pending} sin slot disponible (revisá horarios de canchas)`)
+      }
     },
-    onError: (error) => toast.error(apiErrorMessage(error, 'Error al programar partidos')),
+    onError: (error) => toast.error(apiErrorMessage(error, 'Error al programar los partidos de Ronda 2')),
   })
 
   const zoneMatches = new Map<string, MatchResponse[]>()
@@ -643,9 +652,14 @@ export default function FixtureTab({ tournamentId, startDate, endDate, zoneDays 
               Generar fixture
             </Button>
             {fixture && fixture.pendingCount > 0 && (
-              <Button variant="outline" onClick={() => scheduleMut.mutate()} disabled={scheduleMut.isPending}>
+              <Button
+                variant="outline"
+                onClick={() => scheduleMut.mutate()}
+                disabled={scheduleMut.isPending}
+                title="Programa los partidos de Ronda 2 de zonas de 4 (ganadores vs ganadores · perdedores vs perdedores) respetando restricciones y preferencias horarias"
+              >
                 <Clock size={15} className="mr-1.5" />
-                Programar pendientes ({fixture.pendingCount})
+                Programar Ronda 2 ({fixture.pendingCount})
               </Button>
             )}
           </>
