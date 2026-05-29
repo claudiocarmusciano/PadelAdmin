@@ -20,3 +20,8 @@ export const updateGlobalSettings = async (settings: GlobalSettings): Promise<Gl
   const { data } = await api.put('/settings/general', settings)
   return data
 }
+
+export const resetPlayerPoints = async (): Promise<{ reset: number }> => {
+  const { data } = await api.post('/settings/points/reset')
+  return data
+}

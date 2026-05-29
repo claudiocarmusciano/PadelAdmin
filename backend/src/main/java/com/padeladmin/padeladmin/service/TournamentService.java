@@ -33,6 +33,7 @@ public class TournamentService {
     private final ComplexRepository complexRepository;
     private final MatchRepository matchRepository;
     private final AvailabilityWindowRepository availabilityWindowRepository;
+    private final TournamentPointsService tournamentPointsService;
     private final JdbcTemplate jdbcTemplate;
 
     public List<TournamentResponseDto> findAll() {
@@ -120,12 +121,22 @@ public class TournamentService {
             throw new BusinessException(
                     "El torneo se activa automáticamente al generar el fixture una vez llegada la fecha de inicio");
         }
+        boolean isFinalizing = newStatus == TournamentStatus.COMPLETED
+                && tournament.getStatus() == TournamentStatus.ACTIVE;
+
         if (newStatus == TournamentStatus.COMPLETED && tournament.getStatus() != TournamentStatus.ACTIVE) {
             throw new BusinessException("Solo se puede finalizar un torneo que esté Activo");
         }
 
         tournament.setStatus(newStatus);
-        return toDto(tournamentRepository.save(tournament));
+        Tournament saved = tournamentRepository.save(tournament);
+
+        // Al finalizar: otorgar puntos de ranking a los jugadores (mejor instancia, idempotente)
+        if (isFinalizing) {
+            tournamentPointsService.awardPointsForTournament(saved);
+        }
+
+        return toDto(saved);
     }
 
     /** Llamado internamente por FixtureService al generar el fixture. */

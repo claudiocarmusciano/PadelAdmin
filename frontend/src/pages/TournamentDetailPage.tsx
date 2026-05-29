@@ -49,13 +49,20 @@ export default function TournamentDetailPage() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['tournament', tournamentId] })
       qc.invalidateQueries({ queryKey: ['tournaments'] })
-      toast.success('Torneo finalizado')
+      qc.invalidateQueries({ queryKey: ['playersWithCategories'] })
+      qc.invalidateQueries({ queryKey: ['playerPoints'] })
+      toast.success('Torneo finalizado — puntos de ranking otorgados a los jugadores')
     },
     onError: (error) => toast.error(apiErrorMessage(error, 'Error al finalizar el torneo')),
   })
 
   function handleFinalize() {
-    if (confirm('¿Confirmar que el torneo ha finalizado? Esta acción no se puede deshacer.')) {
+    if (confirm(
+      '¿Confirmar que el torneo ha finalizado?\n\n' +
+      'Se otorgarán los puntos de ranking a cada jugador según la mejor instancia ' +
+      'alcanzada por su pareja (campeón, finalista, semifinal, etc.).\n\n' +
+      'Esta acción no se puede deshacer.'
+    )) {
       finalizeMut.mutate()
     }
   }

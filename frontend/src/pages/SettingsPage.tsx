@@ -1,17 +1,21 @@
 import { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { Settings, Save, Trophy, Clock } from 'lucide-react'
+import { Settings, Save, Trophy, Clock, RotateCcw, AlertTriangle } from 'lucide-react'
 import {
   getPointConfigs, updatePointConfigs,
   getGlobalSettings, updateGlobalSettings,
+  resetPlayerPoints,
 } from '@/api/settings'
 import { STAGE_LABELS } from '@/types'
 import type { PointConfig, GlobalSettings } from '@/types'
+import { useAuth } from '@/contexts/AuthContext'
+import { apiErrorMessage } from '@/lib/axios'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog'
 
 // ── Tabla de puntos por etapa ─────────────────────────────────────────────────
 
@@ -195,9 +199,87 @@ function GeneralCard() {
   )
 }
 
+// ── Nueva temporada: limpieza de puntos ───────────────────────────────────────
+
+function SeasonResetCard() {
+  const qc = useQueryClient()
+  const [open, setOpen] = useState(false)
+  const [confirmText, setConfirmText] = useState('')
+
+  const resetMut = useMutation({
+    mutationFn: resetPlayerPoints,
+    onSuccess: (data) => {
+      qc.invalidateQueries({ queryKey: ['playersWithCategories'] })
+      qc.invalidateQueries({ queryKey: ['playerPoints'] })
+      toast.success(`Puntos reiniciados — ${data.reset} registros en 0. El historial se conservó.`)
+      setOpen(false)
+      setConfirmText('')
+    },
+    onError: (error) => toast.error(apiErrorMessage(error, 'Error al reiniciar los puntos')),
+  })
+
+  return (
+    <Card className="border-destructive/30">
+      <CardHeader>
+        <div className="flex items-center gap-2">
+          <RotateCcw size={18} className="text-destructive" />
+          <CardTitle className="text-base">Nueva temporada</CardTitle>
+        </div>
+        <CardDescription className="text-xs">
+          Reinicia a 0 los puntos vigentes de todos los jugadores en todas las categorías.
+          El historial de puntos otorgados por torneo se conserva.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <Button variant="outline" size="sm"
+          className="border-destructive/40 text-destructive hover:bg-destructive/10"
+          onClick={() => setOpen(true)}>
+          <RotateCcw size={14} className="mr-1.5" />
+          Reiniciar puntos de temporada
+        </Button>
+      </CardContent>
+
+      <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) setConfirmText('') }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle size={16} className="text-destructive" />
+              Reiniciar puntos
+            </DialogTitle>
+            <DialogDescription className="text-xs">
+              Esto pone en <strong>0</strong> los puntos de TODOS los jugadores en TODAS las
+              categorías. No se puede deshacer (pero el historial por torneo queda guardado).
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-2 py-1">
+            <Label className="text-xs">Escribí <strong>REINICIAR</strong> para confirmar</Label>
+            <Input
+              value={confirmText}
+              onChange={(e) => setConfirmText(e.target.value)}
+              placeholder="REINICIAR"
+              autoFocus
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setOpen(false); setConfirmText('') }}>Cancelar</Button>
+            <Button
+              variant="destructive"
+              disabled={confirmText !== 'REINICIAR' || resetMut.isPending}
+              onClick={() => resetMut.mutate()}
+            >
+              Reiniciar puntos
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </Card>
+  )
+}
+
 // ── Página principal ──────────────────────────────────────────────────────────
 
 export default function SettingsPage() {
+  const { isAdmin } = useAuth()
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-2">
@@ -209,6 +291,8 @@ export default function SettingsPage() {
         <PointsCard />
         <GeneralCard />
       </div>
+
+      {isAdmin && <SeasonResetCard />}
     </div>
   )
 }
