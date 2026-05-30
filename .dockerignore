@@ -1,0 +1,22 @@
+# Build artifacts y dependencias — se reconstruyen dentro del Docker
+backend/target/
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+
+# Entorno local
+**/.env
+**/.env.local
+**/.env.*.local
+
+# IDE / OS
+.idea/
+.vscode/
+*.iml
+.DS_Store
+
+# Git y docs
+.git/
+.claude/
+*.md
+"Posteos y documentos/"

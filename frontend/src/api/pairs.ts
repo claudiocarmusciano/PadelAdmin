@@ -1,5 +1,5 @@
 import api from '@/lib/axios'
-import type { Pair, PairRequest, PairPlayerEntry, PairConstraint, PairConstraintRequest, Zone } from '@/types'
+import type { Pair, PairRequest, PairConstraint, PairConstraintRequest, Zone } from '@/types'
 
 export const getPairs = async (tournamentId: number): Promise<Pair[]> => {
   const { data } = await api.get(`/tournaments/${tournamentId}/pairs`)

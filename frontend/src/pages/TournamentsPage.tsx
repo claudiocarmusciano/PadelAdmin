@@ -9,7 +9,7 @@ import { CourtAvailabilityDialog } from '@/components/courts/CourtAvailabilityDi
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 
-import { getTournaments, createTournament, updateTournament, deleteTournament, updateTournamentStatus } from '@/api/tournaments'
+import { getTournaments, createTournament, updateTournament, deleteTournament } from '@/api/tournaments'
 import { apiErrorMessage } from '@/lib/axios'
 import { getCategories } from '@/api/categories'
 import { getComplexes } from '@/api/complexes'
@@ -121,15 +121,6 @@ export default function TournamentsPage() {
     onError: (error) => toast.error(apiErrorMessage(error, 'Error al eliminar el torneo')),
   })
 
-  const statusMut = useMutation({
-    mutationFn: ({ id, status }: { id: number; status: string }) => updateTournamentStatus(id, status),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['tournaments'] })
-      toast.success('Estado actualizado')
-    },
-    onError: (error) => toast.error(apiErrorMessage(error, 'Error al cambiar el estado')),
-  })
-
   function handleOpen(t?: Tournament) {
     if (t) {
       setEditing(t)
@@ -191,12 +182,6 @@ export default function TournamentsPage() {
     })
   }
 
-  // DRAFT → ACTIVE es automático al generar el fixture; solo se expone ACTIVE → COMPLETED
-  function nextStatus(t: Tournament) {
-    if (t.status === 'ACTIVE') return 'COMPLETED'
-    return null
-  }
-
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -233,7 +218,6 @@ export default function TournamentsPage() {
       ) : (
         <div className="grid gap-3">
           {tournaments.map((t) => {
-            const ns = nextStatus(t)
             return (
               <Card key={t.id} className="hover:shadow-md transition-shadow">
                 <CardContent className="flex flex-col md:flex-row md:items-center gap-4 py-3 md:py-4">

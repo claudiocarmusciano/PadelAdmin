@@ -1,7 +1,9 @@
 import axios from 'axios'
 
+// En producción (build bundleado en el backend) usa ruta relativa same-origin "/api".
+// En dev, .env.development apunta a http://localhost:8080/api.
 const api = axios.create({
-  baseURL: 'http://localhost:8080/api',
+  baseURL: import.meta.env.VITE_API_BASE_URL || '/api',
   headers: {
     'Content-Type': 'application/json',
   },

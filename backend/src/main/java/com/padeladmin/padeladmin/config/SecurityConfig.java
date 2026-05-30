@@ -42,8 +42,9 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.PUT, "/api/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.PATCH, "/api/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.DELETE, "/api/**").hasRole("ADMIN")
-                        // Cualquier otra ruta requiere autenticación
-                        .anyRequest().authenticated()
+                        // Frontend (SPA) servido por el backend: estáticos y rutas de cliente
+                        // son públicos. Los datos sensibles están detrás de /api (protegido arriba).
+                        .anyRequest().permitAll()
                 )
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
         return http.build();

@@ -1,4 +1,5 @@
-import { createContext, useContext, useEffect, useState, ReactNode } from 'react'
+import { createContext, useContext, useEffect, useState } from 'react'
+import type { ReactNode } from 'react'
 import { login as apiLogin, register as apiRegister, type UserRole } from '@/api/auth'
 import { getStoredToken, setStoredToken } from '@/lib/axios'
 

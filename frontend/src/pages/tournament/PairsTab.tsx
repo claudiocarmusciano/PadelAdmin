@@ -648,9 +648,6 @@ export default function PairsTab({ tournamentId, fixtureGenerated, startDate, en
       (pl) => !usedPlayerIds.has(pl.id) || String(pl.id) === excludeId
     )
 
-  function playerLabel(p: Player) {
-    return `${p.firstName} ${p.lastName}`
-  }
 
   /** Muestra puntos del jugador en la categoría seleccionada */
   function pointsLabel(slot: PlayerSlot) {
