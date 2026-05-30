@@ -1,5 +1,6 @@
 package com.padeladmin.padeladmin.controller;
 
+import com.padeladmin.padeladmin.dto.tournament.StatusUpdateRequest;
 import com.padeladmin.padeladmin.dto.tournament.TournamentRequestDto;
 import com.padeladmin.padeladmin.dto.tournament.TournamentResponseDto;
 import com.padeladmin.padeladmin.enums.TournamentStatus;
@@ -46,8 +47,8 @@ public class TournamentController {
 
     @PatchMapping("/{id}/status")
     public ResponseEntity<TournamentResponseDto> updateStatus(@PathVariable Long id,
-                                                              @RequestParam TournamentStatus status) {
-        return ResponseEntity.ok(tournamentService.updateStatus(id, status));
+                                                              @Valid @RequestBody StatusUpdateRequest body) {
+        return ResponseEntity.ok(tournamentService.updateStatus(id, body.status()));
     }
 
     @PutMapping("/{id}/zone-days")
