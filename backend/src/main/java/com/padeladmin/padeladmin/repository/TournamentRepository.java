@@ -10,4 +10,7 @@ public interface TournamentRepository extends JpaRepository<Tournament, Long> {
     List<Tournament> findByStatus(TournamentStatus status);
     List<Tournament> findByCategoryId(Long categoryId);
     List<Tournament> findAllByOrderByCreatedAtDesc();
+
+    boolean existsByNameIgnoreCase(String name);
+    boolean existsByNameIgnoreCaseAndIdNot(String name, Long id);
 }

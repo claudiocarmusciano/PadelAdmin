@@ -58,6 +58,11 @@ public class TournamentService {
             throw new BusinessException("La fecha de fin no puede ser anterior a la de inicio");
         }
 
+        String name = dto.getName() == null ? "" : dto.getName().trim();
+        if (tournamentRepository.existsByNameIgnoreCase(name)) {
+            throw new BusinessException("Ya existe un torneo con el nombre \"" + name + "\". Elegí otro nombre.");
+        }
+
         Category category = categoryRepository.findById(dto.getCategoryId())
                 .orElseThrow(() -> new ResourceNotFoundException("Categoría", dto.getCategoryId()));
 
@@ -68,7 +73,7 @@ public class TournamentService {
         }
 
         Tournament tournament = Tournament.builder()
-                .name(dto.getName())
+                .name(name)
                 .startDate(dto.getStartDate())
                 .endDate(dto.getEndDate())
                 .category(category)
@@ -92,6 +97,11 @@ public class TournamentService {
             throw new BusinessException("La fecha de fin no puede ser anterior a la de inicio");
         }
 
+        String name = dto.getName() == null ? "" : dto.getName().trim();
+        if (tournamentRepository.existsByNameIgnoreCaseAndIdNot(name, id)) {
+            throw new BusinessException("Ya existe otro torneo con el nombre \"" + name + "\". Elegí otro nombre.");
+        }
+
         Category category = categoryRepository.findById(dto.getCategoryId())
                 .orElseThrow(() -> new ResourceNotFoundException("Categoría", dto.getCategoryId()));
 
@@ -101,7 +111,7 @@ public class TournamentService {
                     .orElseThrow(() -> new ResourceNotFoundException("Complejo", dto.getComplexId()));
         }
 
-        tournament.setName(dto.getName());
+        tournament.setName(name);
         tournament.setStartDate(dto.getStartDate());
         tournament.setEndDate(dto.getEndDate());
         tournament.setCategory(category);
