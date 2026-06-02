@@ -2,6 +2,8 @@ package com.padeladmin.padeladmin.service;
 
 import com.padeladmin.padeladmin.dto.pair.*;
 import com.padeladmin.padeladmin.entity.*;
+import com.padeladmin.padeladmin.enums.MatchPhase;
+import com.padeladmin.padeladmin.enums.MatchStatus;
 import com.padeladmin.padeladmin.exception.BusinessException;
 import com.padeladmin.padeladmin.exception.ResourceNotFoundException;
 import com.padeladmin.padeladmin.repository.*;
@@ -11,6 +13,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
 import java.util.List;
 
 @Service
@@ -26,6 +29,7 @@ public class PairService {
     private final CategoryRepository categoryRepository;
     private final PlayerCategoryPointsRepository pointsRepository;
     private final MatchRepository matchRepository;
+    private final ZoneRepository zoneRepository;
 
     private static final String[] DAY_NAMES = {
             "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"
@@ -94,7 +98,42 @@ public class PairService {
     @Transactional
     public void delete(Long tournamentId, Long pairId) {
         Pair pair = getPairOrThrow(tournamentId, pairId);
+
+        // No se puede borrar una pareja si el torneo ya tiene resultados registrados
+        boolean anyPlayed = matchRepository.findByTournamentIdAndPhase(tournamentId, MatchPhase.ZONE)
+                .stream().anyMatch(m -> m.getStatus() == MatchStatus.PLAYED);
+        if (anyPlayed) {
+            throw new BusinessException(
+                    "No se puede borrar una pareja: el torneo ya tiene partidos con resultado registrado.");
+        }
+
+        // Borrar una pareja cambia la cantidad de inscriptos → las zonas y el fixture
+        // quedan inválidos. Se borran ambos; el admin debe regenerar zonas y fixture.
+        clearFixtureAndZones(tournamentId);
+
         pairRepository.delete(pair);
+    }
+
+    /**
+     * Borra el fixture (partidos de zona + eliminación) y las zonas del torneo.
+     * Se usa al eliminar una pareja: cambia N y todo debe regenerarse.
+     * Sólo se invoca tras validar que no hay resultados registrados.
+     */
+    private void clearFixtureAndZones(Long tournamentId) {
+        // 1. Partidos (referencian zonas y parejas) — primero por FK
+        List<Match> matches = new ArrayList<>();
+        matches.addAll(matchRepository.findByTournamentIdAndPhase(tournamentId, MatchPhase.ZONE));
+        matches.addAll(matchRepository.findByTournamentIdAndPhase(tournamentId, MatchPhase.ELIMINATION));
+        if (!matches.isEmpty()) {
+            matchRepository.deleteAll(matches);
+            matchRepository.flush();
+        }
+        // 2. Zonas (el cascade ALL de Zone.zonePairs borra los ZonePair)
+        List<Zone> zones = zoneRepository.findByTournamentIdOrderByZoneOrder(tournamentId);
+        if (!zones.isEmpty()) {
+            zoneRepository.deleteAll(zones);
+            zoneRepository.flush();
+        }
     }
 
     // ── Preferencias y restricciones horarias ─────────────────────────────────

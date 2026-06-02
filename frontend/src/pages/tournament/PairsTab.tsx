@@ -305,7 +305,12 @@ function PairRow({ pair, idx, tournamentId, fixtureGenerated, allowedDays, onDel
               size="sm"
               variant="ghost"
               className="h-7 w-7 p-0 shrink-0"
-              onClick={() => { if (confirm('¿Eliminar esta pareja?')) onDelete() }}
+              onClick={() => {
+                const msg = fixtureGenerated
+                  ? '¿Eliminar esta pareja?\n\nLas zonas y el fixture se borrarán y vas a tener que regenerarlos. Solo se puede antes de cargar resultados.'
+                  : '¿Eliminar esta pareja?'
+                if (confirm(msg)) onDelete()
+              }}
             >
               <Trash2 size={14} className="text-destructive" />
             </Button>
@@ -562,7 +567,12 @@ export default function PairsTab({ tournamentId, fixtureGenerated, startDate, en
     mutationFn: (pairId: number) => deletePair(tournamentId, pairId),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['pairs', tournamentId] })
-      toast.success('Pareja eliminada')
+      // Borrar una pareja limpia zonas y fixture en el backend → refrescar esas vistas
+      qc.invalidateQueries({ queryKey: ['zones', tournamentId] })
+      qc.invalidateQueries({ queryKey: ['fixture', tournamentId] })
+      qc.invalidateQueries({ queryKey: ['bracket', tournamentId] })
+      qc.invalidateQueries({ queryKey: ['standings'] })
+      toast.success('Pareja eliminada — regenerá zonas y fixture')
     },
     onError: (error) => toast.error(apiErrorMessage(error, 'Error al eliminar la pareja')),
   })
