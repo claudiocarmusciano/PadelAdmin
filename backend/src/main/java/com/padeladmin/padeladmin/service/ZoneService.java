@@ -101,11 +101,19 @@ public class ZoneService {
             saveZonePair(pairs.get(pairIdx++), zones.get(zi), nextPos[zi]++);
         }
 
-        // Fase 3: Restantes — llenar zonas con cupo disponible en orden
-        for (int zi = 0; zi < totalZones && pairIdx < N; zi++) {
-            Zone zone = zones.get(zi);
-            while (nextPos[zi] <= zone.getZoneSize() && pairIdx < N) {
-                saveZonePair(pairs.get(pairIdx++), zone, nextPos[zi]++);
+        // Fase 3: Posiciones restantes (3ª en adelante) — FILA POR FILA en orden de zona (A, B, C…).
+        // Se asigna una pareja a cada zona con cupo en cada pasada (una pasada = una fila), avanzando
+        // forward. Así, con zonas de 4, la fila 3 y la fila 4 se llenan A→B→C antes de pasar a la
+        // siguiente fila (ej. N=10: P7→A, P8→B, P9→C, P10→A4; N=11: …, P10→A4, P11→B4).
+        boolean assignedInPass = true;
+        while (pairIdx < N && assignedInPass) {
+            assignedInPass = false;
+            for (int zi = 0; zi < totalZones && pairIdx < N; zi++) {
+                Zone zone = zones.get(zi);
+                if (nextPos[zi] <= zone.getZoneSize()) {
+                    saveZonePair(pairs.get(pairIdx++), zone, nextPos[zi]++);
+                    assignedInPass = true;
+                }
             }
         }
 
