@@ -29,7 +29,7 @@ public class ZoneService {
     private final TournamentRepository tournamentRepository;
     private final MatchRepository matchRepository;
 
-    private static final int MIN_PAIRS = 9;
+    private static final int MIN_PAIRS = 6;
 
     // ── Generación automática de zonas ────────────────────────────────────────
 
@@ -173,6 +173,10 @@ public class ZoneService {
 
         saveZonePair(pair, targetZone, newPosition);
 
+        // Cambió la composición de las zonas → el fixture queda inválido: se borra
+        // para forzar su regeneración (no se pierden resultados: ya se validó que no hay).
+        clearZoneFixture(tournamentId);
+
         return findByTournament(tournamentId);
     }
 
@@ -220,6 +224,10 @@ public class ZoneService {
         saveZonePair(sourcePair, targetZone, targetPos);
         saveZonePair(targetPair, sourceZone, sourcePos);
 
+        // Cambió la composición de las zonas → el fixture queda inválido: se borra
+        // para forzar su regeneración.
+        clearZoneFixture(tournamentId);
+
         return findByTournament(tournamentId);
     }
 
@@ -232,6 +240,19 @@ public class ZoneService {
                 .position(position)
                 .build();
         zonePairRepository.save(zp);
+    }
+
+    /**
+     * Borra los partidos de zona del torneo para forzar la regeneración del fixture.
+     * Se llama tras mover/intercambiar parejas (la composición de zonas cambió).
+     * Sólo se invoca cuando ya se validó que no hay partidos con resultado registrado.
+     */
+    private void clearZoneFixture(Long tournamentId) {
+        List<Match> zoneMatches = matchRepository.findByTournamentIdAndPhase(tournamentId, MatchPhase.ZONE);
+        if (!zoneMatches.isEmpty()) {
+            matchRepository.deleteAll(zoneMatches);
+            matchRepository.flush();
+        }
     }
 
     private void reorderPositions(Long zoneId) {

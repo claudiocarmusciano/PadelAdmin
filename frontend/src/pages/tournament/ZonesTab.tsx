@@ -97,7 +97,7 @@ function PairRow({
   const swapMut = useMutation({
     mutationFn: () => swapPairs(tournamentId, pair.pairId, Number(targetPairId)),
     onSuccess: () => {
-      toast.success('Parejas intercambiadas')
+      toast.success('Parejas intercambiadas — el fixture se borró, regeneralo')
       setShowSelect(false)
       setTargetPairId('')
       onMoved()
@@ -204,6 +204,8 @@ export default function ZonesTab({ tournamentId }: Props) {
   function invalidateZones() {
     qc.invalidateQueries({ queryKey: ['zones', tournamentId] })
     qc.invalidateQueries({ queryKey: ['standings'] })
+    // El fixture se borró en el backend al cambiar las zonas → refrescar la pestaña Fixture
+    qc.invalidateQueries({ queryKey: ['fixture', tournamentId] })
   }
 
   return (
@@ -216,7 +218,7 @@ export default function ZonesTab({ tournamentId }: Props) {
           </Button>
         )}
         <p className="text-xs text-muted-foreground">
-          Zonas de 3 parejas (las primeras pueden ser de 4). Mín. 9 parejas. Distribución snake por puntos.
+          Zonas de 3 parejas (las primeras pueden ser de 4). Mín. 6 parejas. Distribución snake por puntos.
         </p>
       </div>
 
