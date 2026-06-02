@@ -66,7 +66,13 @@ export function PlayerCombobox({
       <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
         <Command>
           <CommandInput placeholder="Buscar jugador..." />
-          <CommandList>
+          <CommandList
+            // El scroll-lock del Dialog (react-remove-scroll) bloquea la rueda del
+            // mouse sobre el popover portaleado. Scrolleamos la lista manualmente.
+            onWheel={(e) => {
+              e.currentTarget.scrollTop += e.deltaY
+            }}
+          >
             <CommandEmpty>No se encontró ningún jugador.</CommandEmpty>
             <CommandGroup>
               {sorted.map((p) => (
