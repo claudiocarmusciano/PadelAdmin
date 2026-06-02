@@ -91,6 +91,16 @@ const STATUS_LABELS: Record<string, string> = {
   PENDING: 'Pendiente',
 }
 
+// Punto sólido (color pleno) por estado — igual que la leyenda, para distinguir
+// los bloques de un vistazo (el fondo tenue solo no alcanza en tema oscuro).
+const STATUS_DOT: Record<string, string> = {
+  SCHEDULED: 'bg-sky-400',
+  CONFIRMED: 'bg-indigo-400',
+  PLAYED: 'bg-emerald-400',
+  CANCELLED: 'bg-red-400',
+  PENDING: 'bg-amber-400',
+}
+
 interface DayBucket {
   day: string                            // "2026-05-29"
   matches: MatchResponse[]
@@ -165,7 +175,15 @@ function MatchBlock({
       )}
       title={`${hhmm(match.scheduledStart!)} · ${p1Full} vs ${p2Full}`}
     >
-      <div className="text-[11px] font-bold tabular-nums">{hhmm(match.scheduledStart!)}</div>
+      <div className="flex items-center justify-between gap-1">
+        <span className="text-[11px] font-bold tabular-nums">{hhmm(match.scheduledStart!)}</span>
+        <span className="flex items-center gap-1 shrink-0">
+          <span className={cn('w-1.5 h-1.5 rounded-full shrink-0', STATUS_DOT[match.status] ?? STATUS_DOT.PENDING)} />
+          <span className="text-[9px] uppercase tracking-wide opacity-80">
+            {STATUS_LABELS[match.status] ?? 'Pendiente'}
+          </span>
+        </span>
+      </div>
       <div className="truncate text-[11px] font-medium">{p1Short}</div>
       <div className="truncate text-[11px] opacity-75">{p2Short}</div>
     </button>
