@@ -592,7 +592,8 @@ export default function PairsTab({ tournamentId, fixtureGenerated, startDate, en
     setOpen(false)
     setSlot1(emptySlot)
     setSlot2(emptySlot)
-    setCategoryFilter('')
+    // NO se resetea categoryFilter: la categoría elegida persiste entre parejas
+    // para no tener que re-seleccionarla en cada alta.
   }
 
   function handleCategoryFilterChange(v: string) {
