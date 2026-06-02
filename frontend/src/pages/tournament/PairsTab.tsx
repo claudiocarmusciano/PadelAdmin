@@ -549,8 +549,11 @@ export default function PairsTab({ tournamentId, fixtureGenerated, startDate, en
     }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['pairs', tournamentId] })
-      toast.success('Pareja creada')
-      handleClose()
+      toast.success('Pareja creada — agregá la siguiente')
+      // El diálogo queda ABIERTO para cargar parejas en serie. Solo se limpian
+      // los jugadores; la categoría elegida persiste. Se cierra con la X / Cancelar.
+      setSlot1(emptySlot)
+      setSlot2(emptySlot)
     },
     onError: (error) => toast.error(apiErrorMessage(error, 'Error al crear la pareja')),
   })
