@@ -371,7 +371,7 @@ export function PlayerStatsDialog({ playerId, playerName, onClose }: Props) {
 
   return (
     <Dialog open={playerId !== null} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-3xl sm:max-w-3xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Medal size={18} className="text-amber-400" />
