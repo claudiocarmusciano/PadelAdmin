@@ -279,15 +279,15 @@ export default function TournamentsPage() {
               />
             </div>
             <div className="grid grid-cols-2 gap-4">
-              <div className="grid gap-2">
-                <Label>Fecha de inicio *</Label>
+              <div className="text=[#FF9154] grid gap-1.5">
+                <Label>Fecha inicio *</Label>
                 <Input
                   type="date"
                   value={form.startDate}
                   onChange={(e) => setForm({ ...form, startDate: e.target.value })}
                 />
               </div>
-              <div className="grid gap-1.5">
+              <div className="text=[#FF9154] grid gap-1.5">
                 <Label>Fecha fin *</Label>
                 <Input
                   type="date"
