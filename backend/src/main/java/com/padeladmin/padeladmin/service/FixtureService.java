@@ -423,6 +423,10 @@ public class FixtureService {
         if (violatesMinInterval(pair1Id, slot, scheduled, minInterval)) return false;
         if (pair2Id != null && violatesMinInterval(pair2Id, slot, scheduled, minInterval)) return false;
 
+        // 3b. Orden de rondas en zona de 4: la Ronda 2 (gan/per) debe ir DESPUÉS de la
+        // Ronda 1 de sus parejas + el intervalo mínimo (comparando fecha y hora completas).
+        if (violatesZoneRoundOrder(match, slot, scheduled, minInterval)) return false;
+
         // 4. Restricciones y preferencias: solo aplican a partidos de zona
         if (match.getPhase() == MatchPhase.ZONE) {
             List<PairScheduleConstraint> constraints1 = constraintsByPairId.getOrDefault(pair1Id, List.of());
@@ -484,6 +488,26 @@ public class FixtureService {
                             && prevStart.isBefore(slotEnd.plusMinutes(minIntervalMinutes));
                     return tooCloseAfter || tooCloseBefore;
                 });
+    }
+
+    /**
+     * En zonas de 4, la Ronda 2 (ganadores / perdedores) debe jugarse DESPUÉS de la Ronda 1.
+     * El slot candidato debe empezar a la hora del fin de la R1 de cualquiera de sus parejas
+     * más el intervalo mínimo (comparando fecha + hora completas, así también vale entre días).
+     */
+    private boolean violatesZoneRoundOrder(Match match, TimeSlot slot, List<Match> scheduled, int minIntervalMinutes) {
+        Integer round = match.getZoneRound();
+        if (match.getPhase() != MatchPhase.ZONE || round == null) return false;
+
+        Long p1 = match.getPair1().getId();
+        Long p2 = match.getPair2() != null ? match.getPair2().getId() : null;
+        LocalDateTime slotStart = LocalDateTime.of(slot.getDate(), slot.getStartTime());
+
+        return scheduled.stream()
+                .filter(m -> m.getZoneRound() != null && m.getZoneRound() < round) // rondas previas de la zona
+                .filter(m -> m.getScheduledEnd() != null)
+                .filter(m -> involvesPair(m, p1) || (p2 != null && involvesPair(m, p2)))
+                .anyMatch(m -> slotStart.isBefore(m.getScheduledEnd().plusMinutes(minIntervalMinutes)));
     }
 
     private boolean violatesRestriction(TimeSlot slot, List<PairScheduleConstraint> constraints) {
