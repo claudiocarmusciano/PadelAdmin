@@ -7,6 +7,7 @@ import {
   getCourtAvailability,
   upsertCourtAvailability,
   deleteCourtAvailability,
+  copyAvailabilityToComplex,
   type CourtAvailability,
 } from '@/api/courtAvailability'
 import { apiErrorMessage } from '@/lib/axios'
@@ -108,17 +109,18 @@ export function CourtAvailabilityDialog({ courtId, courtName, onClose }: Props) 
     toast.success('Aplicado a todos los días')
   }
 
-  async function handleSave() {
-    if (!courtId) return
-    // Validar
+  const [copying, setCopying] = useState(false)
+
+  /** Guarda los horarios de esta cancha. Devuelve true si salió bien. */
+  async function saveCurrent(): Promise<boolean> {
+    if (!courtId) return false
     for (let i = 0; i < rows.length; i++) {
       const r = rows[i]
       if (r.enabled && r.openTime >= r.closeTime) {
         toast.error(`${DAYS[i].label}: la apertura debe ser antes del cierre`)
-        return
+        return false
       }
     }
-
     try {
       const tasks: Promise<unknown>[] = []
       for (let i = 0; i < rows.length; i++) {
@@ -130,16 +132,46 @@ export function CourtAvailabilityDialog({ courtId, courtName, onClose }: Props) 
             closeTime: r.closeTime + ':00',
           }))
         } else if (r.existingId) {
-          // Había un registro y ahora se deshabilitó → borrar
           tasks.push(deleteMut.mutateAsync(r.existingId))
         }
       }
       await Promise.all(tasks)
       await qc.invalidateQueries({ queryKey: ['courtAvailability', courtId] })
-      toast.success('Horarios guardados')
-      onClose()
+      return true
     } catch (e) {
       toast.error(apiErrorMessage(e, 'Error al guardar los horarios'))
+      return false
+    }
+  }
+
+  async function handleSave() {
+    if (await saveCurrent()) {
+      toast.success('Horarios guardados')
+      onClose()
+    }
+  }
+
+  /** Guarda y copia estos horarios a las demás canchas activas del complejo. */
+  async function handleSaveAndCopy() {
+    if (!courtId) return
+    if (!confirm('Esto va a REEMPLAZAR los horarios de las demás canchas del complejo por estos. ¿Continuar?')) return
+    setCopying(true)
+    try {
+      if (!(await saveCurrent())) return
+      const res = await copyAvailabilityToComplex(courtId)
+      // Refrescar la disponibilidad de todas las canchas (y el warning de torneos)
+      await qc.invalidateQueries({ queryKey: ['courtAvailability'] })
+      await qc.invalidateQueries({ queryKey: ['courtsAvailability'] })
+      toast.success(
+        res.courtsUpdated > 0
+          ? `Horarios copiados a ${res.courtsUpdated} cancha${res.courtsUpdated === 1 ? '' : 's'} del complejo`
+          : 'No hay otras canchas en el complejo'
+      )
+      onClose()
+    } catch (e) {
+      toast.error(apiErrorMessage(e, 'Error al copiar a las demás canchas'))
+    } finally {
+      setCopying(false)
     }
   }
 
@@ -228,9 +260,19 @@ export function CourtAvailabilityDialog({ courtId, courtName, onClose }: Props) 
               : `${enabledCount} día${enabledCount === 1 ? '' : 's'} habilitado${enabledCount === 1 ? '' : 's'}`}
           </p>
         </div>
-        <DialogFooter>
+        <DialogFooter className="flex-col sm:flex-row gap-2">
+          <Button
+            variant="secondary"
+            className="w-full sm:w-auto sm:mr-auto"
+            onClick={handleSaveAndCopy}
+            disabled={copying || upsertMut.isPending || deleteMut.isPending}
+            title="Guarda estos horarios y los copia a las demás canchas activas del complejo"
+          >
+            <Copy size={14} className="mr-1.5" />
+            {copying ? 'Copiando...' : 'Guardar y copiar a todas las canchas'}
+          </Button>
           <Button variant="outline" onClick={onClose}>Cancelar</Button>
-          <Button onClick={handleSave} disabled={upsertMut.isPending || deleteMut.isPending}>
+          <Button onClick={handleSave} disabled={copying || upsertMut.isPending || deleteMut.isPending}>
             Guardar horarios
           </Button>
         </DialogFooter>

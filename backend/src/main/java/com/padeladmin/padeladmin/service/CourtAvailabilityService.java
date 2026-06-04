@@ -54,6 +54,44 @@ public class CourtAvailabilityService {
         return toDto(availabilityRepository.save(availability));
     }
 
+    /**
+     * Copia la disponibilidad de una cancha a TODAS las demás canchas activas del
+     * mismo complejo (reemplaza la de cada una). Devuelve cuántas canchas se actualizaron.
+     */
+    @Transactional
+    public int copyToComplex(Long sourceCourtId) {
+        Court source = getCourtOrThrow(sourceCourtId);
+        if (source.getComplex() == null) {
+            throw new BusinessException("La cancha no pertenece a ningún complejo");
+        }
+        Long complexId = source.getComplex().getId();
+
+        List<CourtAvailability> sourceAvail =
+                availabilityRepository.findByCourtIdOrderByDayOfWeek(sourceCourtId);
+
+        List<Court> targets = courtRepository.findByComplexIdAndActiveTrue(complexId).stream()
+                .filter(c -> !c.getId().equals(sourceCourtId))
+                .toList();
+
+        for (Court target : targets) {
+            // Reemplazar: borrar la disponibilidad actual del destino y copiar la de la fuente
+            List<CourtAvailability> existing =
+                    availabilityRepository.findByCourtIdOrderByDayOfWeek(target.getId());
+            availabilityRepository.deleteAll(existing);
+            availabilityRepository.flush(); // evita choque con el unique (court_id, day_of_week)
+
+            for (CourtAvailability src : sourceAvail) {
+                availabilityRepository.save(CourtAvailability.builder()
+                        .court(target)
+                        .dayOfWeek(src.getDayOfWeek())
+                        .openTime(src.getOpenTime())
+                        .closeTime(src.getCloseTime())
+                        .build());
+            }
+        }
+        return targets.size();
+    }
+
     @Transactional
     public void delete(Long courtId, Long availabilityId) {
         getCourtOrThrow(courtId);

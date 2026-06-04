@@ -10,6 +10,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/courts/{courtId}/availability")
@@ -37,5 +38,12 @@ public class CourtAvailabilityController {
                                        @PathVariable Long availabilityId) {
         availabilityService.delete(courtId, availabilityId);
         return ResponseEntity.noContent().build();
+    }
+
+    // Copia los horarios de esta cancha a las demás canchas activas del complejo
+    @PostMapping("/copy-to-complex")
+    public ResponseEntity<Map<String, Object>> copyToComplex(@PathVariable Long courtId) {
+        int updated = availabilityService.copyToComplex(courtId);
+        return ResponseEntity.ok(Map.of("courtsUpdated", updated));
     }
 }

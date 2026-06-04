@@ -27,3 +27,11 @@ export const deleteCourtAvailability = async (
 ): Promise<void> => {
   await api.delete(`/courts/${courtId}/availability/${availabilityId}`)
 }
+
+/** Copia los horarios de esta cancha a las demás canchas activas del complejo. */
+export const copyAvailabilityToComplex = async (
+  courtId: number
+): Promise<{ courtsUpdated: number }> => {
+  const { data } = await api.post(`/courts/${courtId}/availability/copy-to-complex`)
+  return data
+}
