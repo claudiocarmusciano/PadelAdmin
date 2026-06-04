@@ -259,18 +259,19 @@ export function CourtAvailabilityDialog({ courtId, courtName, onClose }: Props) 
               ? '⚠️ Sin horarios la cancha no se podrá usar en ningún fixture'
               : `${enabledCount} día${enabledCount === 1 ? '' : 's'} habilitado${enabledCount === 1 ? '' : 's'}`}
           </p>
-        </div>
-        <DialogFooter className="flex-col sm:flex-row gap-2">
+
           <Button
-            variant="secondary"
-            className="w-full sm:w-auto sm:mr-auto"
+            variant="outline"
+            className="w-full mt-1 border-dashed text-muted-foreground hover:text-foreground"
             onClick={handleSaveAndCopy}
             disabled={copying || upsertMut.isPending || deleteMut.isPending}
             title="Guarda estos horarios y los copia a las demás canchas activas del complejo"
           >
-            <Copy size={14} className="mr-1.5" />
-            {copying ? 'Copiando...' : 'Guardar y copiar a todas las canchas'}
+            <Copy size={14} className="mr-1.5 shrink-0" />
+            {copying ? 'Copiando...' : 'Guardar y copiar a las demás canchas del complejo'}
           </Button>
+        </div>
+        <DialogFooter>
           <Button variant="outline" onClick={onClose}>Cancelar</Button>
           <Button onClick={handleSave} disabled={copying || upsertMut.isPending || deleteMut.isPending}>
             Guardar horarios
