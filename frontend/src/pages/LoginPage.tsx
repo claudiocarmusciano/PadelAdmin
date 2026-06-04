@@ -10,11 +10,20 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 
 export default function LoginPage() {
-  const { isAuthenticated, login, loading } = useAuth()
+  const { isAuthenticated, login, loginAsGuest, loading } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+
+  async function handleGuest() {
+    try {
+      await loginAsGuest()
+      navigate('/tournaments', { replace: true })
+    } catch (err) {
+      toast.error(apiErrorMessage(err, 'No se pudo ingresar como invitado'))
+    }
+  }
 
   if (isAuthenticated) {
     const from = (location.state as { from?: string } | null)?.from ?? '/tournaments'
@@ -76,6 +85,25 @@ export default function LoginPage() {
               {loading ? 'Ingresando...' : 'Ingresar'}
             </Button>
           </form>
+
+          <div className="flex items-center gap-3">
+            <div className="h-px flex-1 bg-border" />
+            <span className="text-xs text-muted-foreground">o</span>
+            <div className="h-px flex-1 bg-border" />
+          </div>
+
+          <Button
+            type="button"
+            variant="outline"
+            className="w-full"
+            disabled={loading}
+            onClick={handleGuest}
+          >
+            Ingresar como invitado
+          </Button>
+          <p className="text-xs text-center text-muted-foreground -mt-3">
+            Solo lectura — sin cambios ni altas
+          </p>
 
           <p className="text-sm text-center text-muted-foreground">
             ¿No tenés cuenta?{' '}

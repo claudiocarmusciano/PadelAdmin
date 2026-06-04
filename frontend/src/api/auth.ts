@@ -29,3 +29,9 @@ export async function getMe(): Promise<MeResponse> {
   const { data } = await api.get<MeResponse>('/auth/me')
   return data
 }
+
+/** Acceso de invitado de solo lectura (rol VIEWER), sin credenciales. */
+export async function guestLogin(): Promise<AuthResponse> {
+  const { data } = await api.post<AuthResponse>('/auth/guest')
+  return data
+}

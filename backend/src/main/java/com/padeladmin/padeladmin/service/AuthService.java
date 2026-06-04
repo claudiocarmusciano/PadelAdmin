@@ -1,5 +1,6 @@
 package com.padeladmin.padeladmin.service;
 
+import com.padeladmin.padeladmin.config.GuestSeeder;
 import com.padeladmin.padeladmin.dto.auth.AuthResponse;
 import com.padeladmin.padeladmin.dto.auth.LoginRequest;
 import com.padeladmin.padeladmin.dto.auth.RegisterRequest;
@@ -62,6 +63,16 @@ public class AuthService {
         }
 
         return buildAuthResponse(user);
+    }
+
+    /** Acceso de invitado (solo lectura): emite un token VIEWER sin contraseña. */
+    public AuthResponse loginAsGuest() {
+        User guest = userRepository.findByEmail(GuestSeeder.GUEST_EMAIL)
+                .orElseThrow(() -> new BusinessException("El acceso de invitado no está disponible"));
+        if (!guest.isActive()) {
+            throw new BusinessException("El acceso de invitado está deshabilitado");
+        }
+        return buildAuthResponse(guest);
     }
 
     private AuthResponse buildAuthResponse(User user) {

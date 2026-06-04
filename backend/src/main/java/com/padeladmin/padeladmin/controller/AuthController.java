@@ -33,6 +33,12 @@ public class AuthController {
         return ResponseEntity.ok(authService.login(request));
     }
 
+    /** Acceso de invitado de solo lectura (rol VIEWER), sin credenciales. */
+    @PostMapping("/guest")
+    public ResponseEntity<AuthResponse> guest() {
+        return ResponseEntity.ok(authService.loginAsGuest());
+    }
+
     @GetMapping("/me")
     public ResponseEntity<Map<String, Object>> me() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();

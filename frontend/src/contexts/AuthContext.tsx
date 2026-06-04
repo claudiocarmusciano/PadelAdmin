@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
-import { login as apiLogin, register as apiRegister, type UserRole } from '@/api/auth'
+import { login as apiLogin, register as apiRegister, guestLogin as apiGuestLogin, type UserRole } from '@/api/auth'
 import { getStoredToken, setStoredToken, isTokenExpired } from '@/lib/axios'
 
 interface AuthUser {
@@ -15,6 +15,7 @@ interface AuthContextValue {
   loading: boolean
   login: (email: string, password: string) => Promise<void>
   register: (email: string, password: string) => Promise<void>
+  loginAsGuest: () => Promise<void>
   logout: () => void
 }
 
@@ -84,6 +85,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }
 
+  async function loginAsGuest() {
+    setLoading(true)
+    try {
+      const res = await apiGuestLogin()
+      setStoredToken(res.token)
+      const next = { email: res.email, role: res.role }
+      localStorage.setItem(USER_KEY, JSON.stringify(next))
+      setUser(next)
+    } finally {
+      setLoading(false)
+    }
+  }
+
   function logout() {
     setStoredToken(null)
     localStorage.removeItem(USER_KEY)
@@ -97,6 +111,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     loading,
     login,
     register,
+    loginAsGuest,
     logout,
   }
 

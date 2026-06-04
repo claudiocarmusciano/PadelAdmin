@@ -35,7 +35,7 @@ public class SecurityConfig {
                         // Preflight CORS: siempre permitido sin auth
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         // Endpoints públicos de autenticación
-                        .requestMatchers("/api/auth/login", "/api/auth/register").permitAll()
+                        .requestMatchers("/api/auth/login", "/api/auth/register", "/api/auth/guest").permitAll()
                         // Lectura: cualquier usuario autenticado
                         .requestMatchers(HttpMethod.GET, "/api/**").authenticated()
                         // Escritura: solo ADMIN
