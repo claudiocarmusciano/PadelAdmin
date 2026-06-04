@@ -280,7 +280,7 @@ export default function TournamentsPage() {
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
-                <Label>Fecha inicio *</Label>
+                <Label>Fecha de inicio *</Label>
                 <Input
                   type="date"
                   value={form.startDate}
