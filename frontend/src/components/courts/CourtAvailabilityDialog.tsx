@@ -179,7 +179,7 @@ export function CourtAvailabilityDialog({ courtId, courtName, onClose }: Props) 
 
   return (
     <Dialog open={courtId !== null} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-xl">
+      <DialogContent className="max-w-xl sm:max-w-xl">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Clock size={18} className="text-primary" />
