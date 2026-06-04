@@ -1,6 +1,7 @@
 package com.padeladmin.padeladmin.config;
 
 import com.padeladmin.padeladmin.security.JwtAuthFilter;
+import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -46,6 +47,11 @@ public class SecurityConfig {
                         // son públicos. Los datos sensibles están detrás de /api (protegido arriba).
                         .anyRequest().permitAll()
                 )
+                // Sin autenticar (token ausente/vencido/inválido) → 401 (no 403), para que
+                // el frontend distinga "sesión vencida" de "sin permisos" y cierre sesión solo.
+                .exceptionHandling(ex -> ex.authenticationEntryPoint(
+                        (request, response, authEx) ->
+                                response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "No autenticado")))
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
         return http.build();
     }

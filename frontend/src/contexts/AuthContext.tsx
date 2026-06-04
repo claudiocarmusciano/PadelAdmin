@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 import { login as apiLogin, register as apiRegister, type UserRole } from '@/api/auth'
-import { getStoredToken, setStoredToken } from '@/lib/axios'
+import { getStoredToken, setStoredToken, isTokenExpired } from '@/lib/axios'
 
 interface AuthUser {
   email: string
@@ -34,7 +34,16 @@ const AuthContext = createContext<AuthContextValue | undefined>(undefined)
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(() => {
-    return getStoredToken() ? readStoredUser() : null
+    const token = getStoredToken()
+    // Si no hay token o ya venció, arrancar deslogueado (y limpiar lo que quedó).
+    if (!token || isTokenExpired(token)) {
+      if (token) {
+        setStoredToken(null)
+        localStorage.removeItem(USER_KEY)
+      }
+      return null
+    }
+    return readStoredUser()
   })
   const [loading, setLoading] = useState(false)
 
