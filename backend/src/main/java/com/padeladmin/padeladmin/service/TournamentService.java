@@ -90,9 +90,14 @@ public class TournamentService {
     public TournamentResponseDto update(Long id, TournamentRequestDto dto) {
         Tournament tournament = getOrThrow(id);
 
+        // Permitir edición en DRAFT sin restricciones, o en otros estados si no hay resultados cargados
         if (tournament.getStatus() != TournamentStatus.DRAFT) {
-            throw new BusinessException("Solo se pueden editar torneos en estado DRAFT");
+            boolean hasPlayedMatches = matchRepository.existsPlayedMatchesByTournamentId(id);
+            if (hasPlayedMatches) {
+                throw new BusinessException("No se pueden editar torneos con resultados cargados");
+            }
         }
+
         if (dto.getEndDate().isBefore(dto.getStartDate())) {
             throw new BusinessException("La fecha de fin no puede ser anterior a la de inicio");
         }

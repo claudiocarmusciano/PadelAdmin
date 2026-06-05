@@ -15,6 +15,9 @@ public interface MatchRepository extends JpaRepository<Match, Long> {
 
     boolean existsByTournamentId(Long tournamentId);
 
+    @Query("SELECT CASE WHEN COUNT(m) > 0 THEN true ELSE false END FROM Match m WHERE m.tournament.id = :tournamentId AND m.status = 'PLAYED'")
+    boolean existsPlayedMatchesByTournamentId(@Param("tournamentId") Long tournamentId);
+
     List<Match> findByZoneId(Long zoneId);
 
     List<Match> findByZoneIdAndZoneRound(Long zoneId, Integer zoneRound);

@@ -57,6 +57,12 @@ export default function TournamentsPage() {
   const [deleteTarget, setDeleteTarget] = useState<Tournament | null>(null)
   const [deleteConfirmName, setDeleteConfirmName] = useState('')
 
+  // Detectar si se cambiaron campos que afectan el fixture
+  const fixtureAffectingFieldsChanged = editing && editing.fixtureGenerated && (
+    form.matchDurationMinutes !== editing.matchDurationMinutes ||
+    form.minIntervalMinutes !== editing.minIntervalMinutes
+  )
+
   const { data: tournaments = [], isLoading } = useQuery({
     queryKey: ['tournaments'],
     queryFn: () => getTournaments(),
@@ -279,15 +285,15 @@ export default function TournamentsPage() {
               />
             </div>
             <div className="grid grid-cols-2 gap-4">
-              <div className="text=[#FF9154] grid gap-1.5">
-                <Label>Fecha inicio *</Label>
+              <div className="grid gap-1.5">
+                <Label className="text-[#FF9154]">Fecha inicio *</Label>
                 <Input
                   type="date"
                   value={form.startDate}
                   onChange={(e) => setForm({ ...form, startDate: e.target.value })}
                 />
               </div>
-              <div className="text=[#FF9154] grid gap-1.5">
+              <div className="grid gap-1.5">
                 <Label>Fecha fin *</Label>
                 <Input
                   type="date"
@@ -392,6 +398,17 @@ export default function TournamentsPage() {
                 />
               </div>
             </div>
+
+            {/* Aviso si se modifican campos que afectan el fixture */}
+            {fixtureAffectingFieldsChanged && (
+              <div className="flex items-start gap-2 p-3 rounded-md bg-amber-500/10 border border-amber-500/30">
+                <AlertTriangle size={16} className="text-amber-600 shrink-0 mt-0.5" />
+                <div className="text-sm text-amber-700">
+                  <p className="font-semibold mb-1">Se debe regenerar el fixture</p>
+                  <p className="text-xs">Si guardás estos cambios, la programación de partidos será invalidada y deberás regenerar el fixture.</p>
+                </div>
+              </div>
+            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={handleClose}>Cancelar</Button>
