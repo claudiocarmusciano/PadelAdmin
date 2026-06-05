@@ -120,6 +120,9 @@ function ConstraintsSection({ pair, tournamentId, locked, allowedDays }: { pair:
     addMut.mutate()
   }
 
+  // El invitado (VIEWER) no ve restricciones ni preferencias horarias
+  if (!isAdmin) return null
+
   return (
     <div className="mt-3 border-t border-border pt-3 space-y-2">
       <div className="flex items-center justify-between">
