@@ -262,7 +262,8 @@ function PairRow({ pair, idx, tournamentId, fixtureGenerated, allowedDays, onDel
   onDelete: () => void
 }) {
   const { isAdmin } = useAuth()
-  const [expanded, setExpanded] = useState(false)
+  // Arranca desplegado: muestra restricciones/preferencias de cada pareja sin tener que abrir
+  const [expanded, setExpanded] = useState(true)
 
   return (
     <Card>
