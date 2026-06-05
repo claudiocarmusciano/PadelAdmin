@@ -5,7 +5,7 @@ import { CalendarDays, Play, Clock, CheckCircle, XCircle, AlertCircle, Pencil, C
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 
-import { getFixture, generateFixture, schedulePending, setZoneDays } from '@/api/tournaments'
+import { getFixture, generateFixture, schedulePending, reorganizeZones, setZoneDays } from '@/api/tournaments'
 import { useAuth } from '@/contexts/AuthContext'
 import { apiErrorMessage } from '@/lib/axios'
 import { recordResult, updateResult, updateMatchCourt, getComplexesWithCourts } from '@/api/matches'
@@ -560,6 +560,21 @@ export default function FixtureTab({ tournamentId, startDate, endDate, zoneDays 
     onError: (error) => toast.error(apiErrorMessage(error, 'Error al programar los partidos de Ronda 2')),
   })
 
+  const reorganizeMut = useMutation({
+    mutationFn: () => reorganizeZones(tournamentId),
+    onSuccess: (data) => {
+      qc.invalidateQueries({ queryKey: ['fixture', tournamentId] })
+      qc.invalidateQueries({ queryKey: ['zones', tournamentId] })
+      qc.invalidateQueries({ queryKey: ['standings'] })
+      if (data.solved) {
+        toast.success(data.message)
+      } else {
+        toast.warning(data.message, { duration: 8000 })
+      }
+    },
+    onError: (error) => toast.error(apiErrorMessage(error, 'Error al reordenar las zonas')),
+  })
+
   const zoneMatches = new Map<string, MatchResponse[]>()
   const eliminationMatches: MatchResponse[] = []
 
@@ -673,6 +688,24 @@ export default function FixtureTab({ tournamentId, startDate, endDate, zoneDays 
               >
                 <Clock size={15} className="mr-1.5" />
                 Programar Ronda 2 ({fixture.pendingCount})
+              </Button>
+            )}
+            {fixture && fixture.pendingCount > 0 && !fixture.matches.some((m) => m.status === 'PLAYED') && (
+              <Button
+                variant="outline"
+                onClick={() => {
+                  if (!confirm(
+                    'Reordenar zonas: prueba intercambiar parejas entre zonas (las cabezas no se mueven) ' +
+                    'para que entren todos los partidos. Borra y regenera el fixture. ' +
+                    'Solo posible si no hay resultados cargados. ¿Continuar?'
+                  )) return
+                  reorganizeMut.mutate()
+                }}
+                disabled={reorganizeMut.isPending}
+                title="Intercambia parejas entre zonas (cabezas fijas) buscando una combinación donde se programen todos los partidos"
+              >
+                <AlertTriangle size={15} className="mr-1.5" />
+                {reorganizeMut.isPending ? 'Reordenando…' : 'Reordenar zonas para programar todo'}
               </Button>
             )}
           </>

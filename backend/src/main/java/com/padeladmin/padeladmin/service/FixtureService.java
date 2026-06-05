@@ -3,6 +3,7 @@ package com.padeladmin.padeladmin.service;
 import com.padeladmin.padeladmin.dto.fixture.FixtureResponseDto;
 import com.padeladmin.padeladmin.dto.fixture.MatchPairDto;
 import com.padeladmin.padeladmin.dto.fixture.MatchResponseDto;
+import com.padeladmin.padeladmin.dto.fixture.ReorganizeResultDto;
 import com.padeladmin.padeladmin.entity.*;
 import com.padeladmin.padeladmin.enums.ConstraintType;
 import com.padeladmin.padeladmin.enums.MatchPhase;
@@ -619,6 +620,202 @@ public class FixtureService {
                 pendingMatches.size(), tournamentId);
 
         return buildResponse(tournamentId, matchRepository.findByTournamentIdAndPhase(tournamentId, MatchPhase.ZONE));
+    }
+
+    // ── Reordenar zonas para programar todos los partidos ─────────────────────
+
+    /**
+     * Cuando quedan partidos sin programar (por restricciones que se pisan, o por falta de
+     * canchas), intenta intercambiar parejas entre zonas para que entren todos.
+     *
+     * Reglas (definidas con el usuario):
+     *  - Las CABEZAS de zona (posición 1) nunca se mueven.
+     *  - Se prueban intercambios DE A PARES entre zonas, cada uno INDEPENDIENTE desde la config base.
+     *  - Escalado por nivel desde el fondo: primero las últimas de cada zona, luego anteúltimas, etc.
+     *  - Si algún intercambio llega a 0 sin programar → se aplica. Si no, se aplica el MEJOR (menos pendientes).
+     *  - Si aún quedan pendientes → se sugiere sumar canchas/otro complejo.
+     */
+    @Transactional
+    public ReorganizeResultDto reorganizeZonesToSchedule(Long tournamentId) {
+        Tournament tournament = getTournamentOrThrow(tournamentId);
+        if (tournament.getComplex() == null) {
+            throw new BusinessException("El torneo no tiene un complejo asignado");
+        }
+
+        List<Match> existingZone = matchRepository.findByTournamentIdAndPhase(tournamentId, MatchPhase.ZONE);
+        if (existingZone.stream().anyMatch(m -> m.getStatus() == MatchStatus.PLAYED)) {
+            throw new BusinessException("No se puede reordenar las zonas: ya hay partidos con resultado registrado.");
+        }
+
+        List<Zone> zones = zoneRepository.findByTournamentIdOrderByZoneOrder(tournamentId);
+        if (zones.isEmpty()) {
+            throw new BusinessException("El torneo no tiene zonas generadas.");
+        }
+
+        // Contexto de scheduling (una sola vez)
+        List<Court> courts = courtRepository.findByComplexIdAndActiveTrue(tournament.getComplex().getId());
+        if (courts.isEmpty()) {
+            throw new BusinessException("El complejo no tiene canchas activas");
+        }
+        Map<Long, Court> courtMap = courts.stream().collect(Collectors.toMap(Court::getId, c -> c));
+        Map<Long, List<CourtAvailability>> availByCourt = courts.stream().collect(Collectors.toMap(
+                Court::getId, c -> courtAvailabilityRepository.findByCourtIdOrderByDayOfWeek(c.getId())));
+        List<TournamentBuffer> buffers = bufferRepository.findByTournamentIdOrderByDayOfWeek(tournamentId);
+        List<TimeSlot> slots = generateTimeSlots(tournament, courts, availByCourt, buffers);
+        if (slots.isEmpty()) {
+            throw new BusinessException("No hay slots disponibles (revisá horarios de canchas).");
+        }
+        slots.sort(Comparator.comparing(TimeSlot::getDate)
+                .thenComparing(TimeSlot::getStartTime)
+                .thenComparingLong(TimeSlot::getCourtId));
+
+        // Arreglo base: por zona, lista de parejas ordenada por posición (índice 0 = cabeza)
+        Map<Long, Zone> zoneById = new LinkedHashMap<>();
+        Map<Long, List<Pair>> base = new LinkedHashMap<>();
+        for (Zone z : zones) {
+            zoneById.put(z.getId(), z);
+            List<Pair> ordered = zonePairRepository.findByZoneIdOrderByPosition(z.getId())
+                    .stream().map(ZonePair::getPair).collect(Collectors.toList());
+            if (ordered.size() != z.getZoneSize()) {
+                throw new BusinessException("La Zona " + z.getName() + " está incompleta. Regenerá las zonas.");
+            }
+            base.put(z.getId(), ordered);
+        }
+
+        // Restricciones de todas las parejas (una vez)
+        Map<Long, List<PairScheduleConstraint>> constraints = new HashMap<>();
+        for (List<Pair> ps : base.values()) {
+            for (Pair p : ps) constraints.computeIfAbsent(p.getId(), constraintRepository::findByPairId);
+        }
+
+        int basePending = evaluateArrangement(base, zones, tournament, slots, courtMap, constraints);
+        Map<Long, List<Pair>> best = deepCopyArrangement(base);
+        int bestPending = basePending;
+        String swapDesc = null;
+
+        if (basePending > 0) {
+            outer:
+            for (int d = 0; ; d++) {
+                // Candidatos del nivel d: par en posición (size - d) de cada zona, si esa posición >= 2 (no cabeza)
+                List<long[]> candidates = new ArrayList<>(); // [zoneId, índice 0-based]
+                for (Zone z : zones) {
+                    int pos = z.getZoneSize() - d; // 1-based
+                    if (pos >= 2) candidates.add(new long[]{ z.getId(), pos - 1 });
+                }
+                if (candidates.size() < 2) break; // sin más niveles con al menos 2 zonas intercambiables
+
+                for (int i = 0; i < candidates.size(); i++) {
+                    for (int j = i + 1; j < candidates.size(); j++) {
+                        Map<Long, List<Pair>> trial = deepCopyArrangement(base); // independiente desde base
+                        long ziA = candidates.get(i)[0]; int idxA = (int) candidates.get(i)[1];
+                        long ziB = candidates.get(j)[0]; int idxB = (int) candidates.get(j)[1];
+                        Pair pa = trial.get(ziA).get(idxA);
+                        Pair pb = trial.get(ziB).get(idxB);
+                        trial.get(ziA).set(idxA, pb);
+                        trial.get(ziB).set(idxB, pa);
+
+                        int pending = evaluateArrangement(trial, zones, tournament, slots, courtMap, constraints);
+                        if (pending < bestPending) {
+                            bestPending = pending;
+                            best = deepCopyArrangement(trial);
+                            swapDesc = "Zona " + zoneById.get(ziA).getName() + " ↔ Zona " + zoneById.get(ziB).getName();
+                        }
+                        if (pending == 0) break outer;
+                    }
+                }
+            }
+        }
+
+        boolean changed = !sameArrangement(base, best);
+        if (changed) {
+            persistArrangement(best, zoneById);
+        }
+
+        // Regenerar el fixture persistido con el mejor arreglo (reutiliza la generación estándar)
+        FixtureResponseDto fixture = generateFixture(tournamentId);
+
+        String message;
+        if (bestPending == 0) {
+            message = changed
+                    ? "Listo: se programaron todos los partidos reordenando zonas (" + swapDesc + ")."
+                    : "Ya estaban todos los partidos programados.";
+        } else {
+            message = "Aún quedan " + bestPending + " partido(s) sin programar después de probar todos los "
+                    + "intercambios posibles. Conviene sumar otra cancha o complejo.";
+        }
+        log.info("Reordenar zonas torneo {}: basePending={} → bestPending={} (cambió={})",
+                tournamentId, basePending, bestPending, changed);
+
+        return ReorganizeResultDto.builder()
+                .solved(bestPending == 0)
+                .pending(bestPending)
+                .swapApplied(changed ? swapDesc : null)
+                .suggestMoreCourts(bestPending > 0)
+                .message(message)
+                .fixture(fixture)
+                .build();
+    }
+
+    /** Cuenta partidos sin programar (status != SCHEDULED) para un arreglo dado, sin persistir. */
+    private int evaluateArrangement(Map<Long, List<Pair>> arrangement, List<Zone> zones, Tournament t,
+                                    List<TimeSlot> slots, Map<Long, Court> courtMap,
+                                    Map<Long, List<PairScheduleConstraint>> constraints) {
+        List<Match> matches = new ArrayList<>();
+        for (Zone z : zones) {
+            matches.addAll(buildZoneMatchesFromPairs(z, arrangement.get(z.getId()), t));
+        }
+        scheduleMatches(matches, slots, courtMap, t, constraints, new ArrayList<>());
+        return (int) matches.stream().filter(m -> m.getStatus() != MatchStatus.SCHEDULED).count();
+    }
+
+    /** Genera los partidos de una zona a partir de una lista de parejas en memoria (índice 0 = posición 1). */
+    private List<Match> buildZoneMatchesFromPairs(Zone zone, List<Pair> pairs, Tournament t) {
+        List<Match> matches = new ArrayList<>();
+        if (zone.getZoneSize() == 3) {
+            matches.add(buildMatch(t, zone, pairs.get(0), pairs.get(1)));
+            matches.add(buildMatch(t, zone, pairs.get(0), pairs.get(2)));
+            matches.add(buildMatch(t, zone, pairs.get(1), pairs.get(2)));
+        } else {
+            Match m1 = buildMatch(t, zone, pairs.get(0), pairs.get(3)); m1.setZoneRound(1);
+            Match m2 = buildMatch(t, zone, pairs.get(1), pairs.get(2)); m2.setZoneRound(1);
+            matches.add(m1);
+            matches.add(m2);
+        }
+        return matches;
+    }
+
+    private Map<Long, List<Pair>> deepCopyArrangement(Map<Long, List<Pair>> src) {
+        Map<Long, List<Pair>> out = new LinkedHashMap<>();
+        src.forEach((k, v) -> out.put(k, new ArrayList<>(v)));
+        return out;
+    }
+
+    private boolean sameArrangement(Map<Long, List<Pair>> a, Map<Long, List<Pair>> b) {
+        for (Long zid : a.keySet()) {
+            List<Pair> la = a.get(zid), lb = b.get(zid);
+            if (la.size() != lb.size()) return false;
+            for (int i = 0; i < la.size(); i++) {
+                if (!la.get(i).getId().equals(lb.get(i).getId())) return false;
+            }
+        }
+        return true;
+    }
+
+    /** Reemplaza los zone_pairs por el arreglo dado (borra y recrea por el unique (zone_id, position)). */
+    private void persistArrangement(Map<Long, List<Pair>> arrangement, Map<Long, Zone> zoneById) {
+        for (Long zid : arrangement.keySet()) {
+            zonePairRepository.deleteAll(zonePairRepository.findByZoneIdOrderByPosition(zid));
+        }
+        zonePairRepository.flush();
+        for (Map.Entry<Long, List<Pair>> e : arrangement.entrySet()) {
+            Zone zone = zoneById.get(e.getKey());
+            List<Pair> pairs = e.getValue();
+            for (int i = 0; i < pairs.size(); i++) {
+                zonePairRepository.save(ZonePair.builder()
+                        .zone(zone).pair(pairs.get(i)).position(i + 1).build());
+            }
+        }
+        zonePairRepository.flush();
     }
 
     private Tournament getTournamentOrThrow(Long id) {

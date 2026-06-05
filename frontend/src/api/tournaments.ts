@@ -51,6 +51,20 @@ export const schedulePending = async (tournamentId: number): Promise<FixtureResp
   return data
 }
 
+export interface ReorganizeResult {
+  solved: boolean
+  pending: number
+  swapApplied: string | null
+  suggestMoreCourts: boolean
+  message: string
+  fixture: FixtureResponse
+}
+
+export const reorganizeZones = async (tournamentId: number): Promise<ReorganizeResult> => {
+  const { data } = await api.post(`/tournaments/${tournamentId}/fixture/reorganize`)
+  return data
+}
+
 // Eliminación
 export const generateElimination = async (tournamentId: number): Promise<EliminationBracket> => {
   const { data } = await api.post(`/tournaments/${tournamentId}/elimination/generate`)

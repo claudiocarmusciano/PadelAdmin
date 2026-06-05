@@ -1,6 +1,7 @@
 package com.padeladmin.padeladmin.controller;
 
 import com.padeladmin.padeladmin.dto.fixture.FixtureResponseDto;
+import com.padeladmin.padeladmin.dto.fixture.ReorganizeResultDto;
 import com.padeladmin.padeladmin.service.FixtureService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -29,5 +30,12 @@ public class FixtureController {
     @PostMapping("/schedule-pending")
     public ResponseEntity<FixtureResponseDto> schedulePending(@PathVariable Long tournamentId) {
         return ResponseEntity.ok(fixtureService.schedulePendingMatches(tournamentId));
+    }
+
+    // Reordena parejas entre zonas (intercambios de a pares, cabezas fijas) para intentar
+    // programar todos los partidos cuando quedan pendientes por restricciones/canchas.
+    @PostMapping("/reorganize")
+    public ResponseEntity<ReorganizeResultDto> reorganize(@PathVariable Long tournamentId) {
+        return ResponseEntity.ok(fixtureService.reorganizeZonesToSchedule(tournamentId));
     }
 }
