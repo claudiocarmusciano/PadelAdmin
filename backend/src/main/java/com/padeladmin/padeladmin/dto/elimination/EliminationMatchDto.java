@@ -19,6 +19,9 @@ public class EliminationMatchDto {
     private Integer bracketSlot;       // posición dentro de la ronda (1, 2, 3...)
     private MatchPairDto pair1;        // null si aún no se conoce el clasificado
     private MatchPairDto pair2;        // null si aún no se conoce el clasificado
+    // Etiquetas tentativas (vista previa o slots "por definir"): "1º Zona A", "Ganador", "BYE"
+    private String pair1Label;
+    private String pair2Label;
     private boolean bye;
     private String courtName;
     @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss")

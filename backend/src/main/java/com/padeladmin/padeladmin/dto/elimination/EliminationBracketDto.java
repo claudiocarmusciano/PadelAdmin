@@ -12,6 +12,8 @@ public class EliminationBracketDto {
     private Long tournamentId;
     private Integer totalClassified;
     private Integer bracketSize;
+    // true = vista previa estructural (zonas sin terminar; los cruces son tentativos por posición de zona)
+    private boolean preview;
     // Matches agrupados por ronda: clave = eliminationRound (8, 4, 2, 1)
     // ordenadas de mayor (R16) a menor (Final)
     private Map<Integer, List<EliminationMatchDto>> rounds;

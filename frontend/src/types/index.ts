@@ -330,6 +330,8 @@ export interface EliminationMatch {
   bracketSlot: number
   pair1?: MatchPair
   pair2?: MatchPair
+  pair1Label?: string
+  pair2Label?: string
   bye: boolean
   courtName?: string
   scheduledStart?: string
@@ -343,6 +345,7 @@ export interface EliminationBracket {
   tournamentId: number
   totalClassified: number
   bracketSize: number
+  preview?: boolean
   rounds: Record<string, EliminationMatch[]>
 }
 

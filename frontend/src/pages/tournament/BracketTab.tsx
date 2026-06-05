@@ -89,7 +89,9 @@ function BracketMatch({
             <span className={isLoser ? 'line-through decoration-muted-foreground/30' : ''}>
               {match.pair1
                 ? `${match.pair1.player1} / ${match.pair1.player2}`
-                : <span className="not-italic text-muted-foreground italic">Por definir</span>}
+                : match.pair1Label
+                  ? <span className="text-muted-foreground italic">{match.pair1Label}</span>
+                  : <span className="not-italic text-muted-foreground italic">Por definir</span>}
             </span>
           </div>
         )
@@ -113,7 +115,9 @@ function BracketMatch({
                 ? 'BYE — pasa directo'
                 : match.pair2
                   ? `${match.pair2.player1} / ${match.pair2.player2}`
-                  : <span className="not-italic text-muted-foreground italic">Por definir</span>}
+                  : match.pair2Label
+                    ? <span className="text-muted-foreground italic">{match.pair2Label}</span>
+                    : <span className="not-italic text-muted-foreground italic">Por definir</span>}
             </span>
           </div>
         )
@@ -256,10 +260,25 @@ export default function BracketTab({ tournamentId }: Props) {
         )}
         {bracket && (
           <span className="text-sm text-muted-foreground">
-            {bracket.totalClassified} clasificados · bracket de {bracket.bracketSize}
+            {bracket.preview
+              ? `${bracket.totalClassified} clasificarán · cuadro de ${bracket.bracketSize}`
+              : `${bracket.totalClassified} clasificados · bracket de ${bracket.bracketSize}`}
           </span>
         )}
       </div>
+
+      {bracket?.preview && (
+        <div className="flex items-start gap-2 p-3 rounded-md bg-amber-500/10 border border-amber-500/30 text-sm">
+          <Trophy size={15} className="text-amber-500 shrink-0 mt-0.5" />
+          <div className="text-amber-700">
+            <p className="font-semibold">Vista previa del cuadro</p>
+            <p className="text-xs mt-0.5">
+              Los cruces se muestran por posición (ej: <em>1º Zona A vs 2º Zona D</em>) según el sorteo oficial.
+              Se confirman con las parejas reales cuando cargues todos los resultados de zona y generes el bracket.
+            </p>
+          </div>
+        </div>
+      )}
 
       {isLoading ? (
         <p className="text-muted-foreground text-sm">Cargando...</p>
@@ -267,8 +286,8 @@ export default function BracketTab({ tournamentId }: Props) {
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12 gap-3">
             <Trophy size={32} className="text-muted-foreground" />
-            <p className="text-sm font-medium">No hay bracket generado</p>
-            <p className="text-xs text-muted-foreground">Primero registrá los resultados de zona</p>
+            <p className="text-sm font-medium">Todavía no se puede armar el cuadro</p>
+            <p className="text-xs text-muted-foreground">Generá las zonas del torneo para ver la vista previa del cuadro</p>
           </CardContent>
         </Card>
       ) : (

@@ -166,7 +166,9 @@ public class EliminationService {
                 .findByTournamentIdAndPhase(tournamentId, MatchPhase.ELIMINATION);
 
         if (matches.isEmpty()) {
-            throw new BusinessException("El bracket eliminatorio aún no fue generado");
+            // Todavía no se generó el bracket real (faltan resultados de zona).
+            // Devolvemos una VISTA PREVIA estructural con los cruces tentativos por posición.
+            return getBracketPreview(tournamentId);
         }
 
         int bracketSize = matches.stream()
@@ -195,8 +197,126 @@ public class EliminationService {
                 .tournamentId(tournamentId)
                 .totalClassified((int) totalClassified)
                 .bracketSize(bracketSize)
+                .preview(false)
                 .rounds(orderedRounds)
                 .build();
+    }
+
+    // ── Vista previa del bracket (sin resultados de zona) ──────────────────────
+
+    /**
+     * Arma el cuadro eliminatorio de forma TENTATIVA, antes de que las zonas tengan resultados.
+     * No persiste nada: usa "clasificados virtuales" (zona + posición) y reutiliza exactamente la
+     * misma lógica de seeding (templates FAP + resolución de conflictos de zona) que la generación real.
+     *
+     * Cada cruce se rotula por posición:
+     *   - 1ª ronda: "1º Zona A" vs "2º Zona D", "BYE", etc.
+     *   - rondas siguientes: "Ganador" (propagando el seed concreto cuando viene de un BYE).
+     */
+    public EliminationBracketDto getBracketPreview(Long tournamentId) {
+        tournamentRepository.findById(tournamentId)
+                .orElseThrow(() -> new ResourceNotFoundException("Torneo", tournamentId));
+
+        List<Zone> zones = zoneRepository.findByTournamentIdOrderByZoneOrder(tournamentId);
+        if (zones.isEmpty()) {
+            throw new BusinessException("El torneo no tiene zonas generadas todavía.");
+        }
+
+        // Clasificados "virtuales" en el MISMO orden que getClassifiedPairs:
+        // todos los 1º (en orden de zona), luego todos los 2º, luego los 3º (solo zonas de 4)
+        List<ClassifiedPairInfo> virtual = new ArrayList<>();
+        for (Zone z : zones) virtual.add(new ClassifiedPairInfo(null, z.getId(), z.getName(), 1));
+        for (Zone z : zones) virtual.add(new ClassifiedPairInfo(null, z.getId(), z.getName(), 2));
+        for (Zone z : zones) if (z.getZoneSize() == 4) virtual.add(new ClassifiedPairInfo(null, z.getId(), z.getName(), 3));
+
+        int n = virtual.size();
+        if (n < 2) throw new BusinessException("Se necesitan al menos 2 parejas para armar el cuadro.");
+
+        int totalPairs = (int) pairRepository.countByTournamentId(tournamentId);
+        int bracketSize = nextPowerOf2(n);
+        int numByes = bracketSize - n;
+
+        // Mismo seeding y resolución de conflictos que el bracket real (todo opera sobre zona+posición)
+        List<Integer> seedOrder = generateSeedOrder(n, bracketSize, totalPairs);
+        List<ClassifiedPairInfo> seedMap = new ArrayList<>(virtual);
+        for (int i = 0; i < numByes; i++) seedMap.add(null); // BYE
+        resolveZoneConflicts(seedOrder, seedMap);
+
+        int firstElim = bracketSize / 2;
+
+        // Por ronda: cada match es [topLabel, botLabel, advancingLabel, bye("1"/"0")]
+        Map<Integer, List<String[]>> byRound = new HashMap<>();
+
+        // Primera ronda jugada (a partir del seedOrder)
+        List<String[]> firstRound = new ArrayList<>();
+        for (int i = 0; i < seedOrder.size(); i += 2) {
+            ClassifiedPairInfo a = seedMap.get(seedOrder.get(i) - 1);
+            ClassifiedPairInfo b = seedMap.get(seedOrder.get(i + 1) - 1);
+            boolean bye = (a == null || b == null);
+            if (bye) {
+                // En un BYE, la pareja real pasa directo → la mostramos arriba (pair1)
+                String real = (a != null) ? posLabel(a) : posLabel(b);
+                firstRound.add(new String[]{ real, "BYE", real, "1" });
+            } else {
+                firstRound.add(new String[]{ posLabel(a), posLabel(b), "Ganador", "0" });
+            }
+        }
+        byRound.put(firstElim, firstRound);
+
+        // Rondas siguientes: cada slot recibe el "advancingLabel" de sus dos alimentadores
+        int round = firstElim / 2;
+        while (round >= 1) {
+            List<String[]> prev = byRound.get(round * 2);
+            List<String[]> cur = new ArrayList<>();
+            for (int s = 0; s < prev.size() / 2; s++) {
+                String top = prev.get(2 * s)[2];
+                String bot = prev.get(2 * s + 1)[2];
+                cur.add(new String[]{ top, bot, "Ganador", "0" });
+            }
+            byRound.put(round, cur);
+            round /= 2;
+        }
+
+        // Armar DTOs (id sintético, no persistido)
+        Map<Integer, List<EliminationMatchDto>> rounds = new TreeMap<>(Comparator.reverseOrder());
+        for (Map.Entry<Integer, List<String[]>> e : byRound.entrySet()) {
+            int r = e.getKey();
+            List<EliminationMatchDto> dtos = new ArrayList<>();
+            List<String[]> ms = e.getValue();
+            for (int slot = 0; slot < ms.size(); slot++) {
+                String[] m = ms.get(slot);
+                dtos.add(EliminationMatchDto.builder()
+                        .id((long) (r * 1000L + slot + 1))
+                        .eliminationRound(r)
+                        .roundName(roundName(r))
+                        .bracketSlot(slot + 1)
+                        .pair1Label(m[0])
+                        .pair2Label(m[1])
+                        .bye("1".equals(m[3]))
+                        .status(MatchStatus.PENDING)
+                        .build());
+            }
+            rounds.put(r, dtos);
+        }
+
+        return EliminationBracketDto.builder()
+                .tournamentId(tournamentId)
+                .totalClassified(n)
+                .bracketSize(bracketSize)
+                .preview(true)
+                .rounds(rounds)
+                .build();
+    }
+
+    /** Etiqueta de posición de un clasificado virtual: "1º Zona A". */
+    private String posLabel(ClassifiedPairInfo info) {
+        String ord = switch (info.zonePosition()) {
+            case 1 -> "1º";
+            case 2 -> "2º";
+            case 3 -> "3º";
+            default -> info.zonePosition() + "º";
+        };
+        return ord + " Zona " + info.zoneName();
     }
 
     // ── Clasificados por zona ─────────────────────────────────────────────────
