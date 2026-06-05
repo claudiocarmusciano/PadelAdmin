@@ -638,18 +638,27 @@ export default function FixtureTab({ tournamentId, startDate, endDate, zoneDays 
         {isAdmin && (
           <>
             <Button
-              onClick={() => generateMut.mutate()}
+              onClick={() => {
+                const hasFixture = !!fixture && fixture.matches.length > 0
+                if (hasFixture && !confirm(
+                  'Rehacer fixture: se borra y regenera TODO el fixture actual. ' +
+                  'Solo es posible si todavía no se cargó ningún resultado. ¿Continuar?'
+                )) return
+                generateMut.mutate()
+              }}
               disabled={generateMut.isPending || !zoneDaysReady}
               title={
                 zoneDaysEmpty
                   ? 'Seleccioná y guardá los días de zona antes de generar el fixture'
                   : zoneDaysDirty
                     ? 'Hay cambios sin guardar en los días de zona'
-                    : undefined
+                    : (fixture && fixture.matches.length > 0
+                        ? 'Borra y regenera el fixture (solo si no hay resultados cargados)'
+                        : undefined)
               }
             >
               <CalendarDays size={15} className="mr-1.5" />
-              Generar fixture
+              {fixture && fixture.matches.length > 0 ? 'Rehacer fixture' : 'Generar fixture'}
             </Button>
             {fixture && fixture.pendingCount > 0 && (
               <Button

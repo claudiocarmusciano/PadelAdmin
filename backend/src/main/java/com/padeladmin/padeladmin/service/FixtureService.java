@@ -61,8 +61,8 @@ public class FixtureService {
                 .anyMatch(m -> m.getStatus() == MatchStatus.PLAYED);
         if (anyPlayed) {
             throw new BusinessException(
-                    "No se puede regenerar el fixture: ya hay partidos con resultado registrado. " +
-                    "Use POST /api/tournaments/{id}/fixture/schedule-pending para programar partidos pendientes.");
+                    "No se puede rehacer el fixture: ya hay partidos con resultado registrado. " +
+                    "Si quedan partidos sin programar, usá \"Programar Ronda 2\".");
         }
         matchRepository.deleteAll(existingMatches);
 
