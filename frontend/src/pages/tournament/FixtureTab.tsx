@@ -29,6 +29,11 @@ const ALL_DAYS = [
   { value: 7, label: 'Dom' },
 ]
 
+// Normaliza para búsqueda: minúsculas y sin acentos (ú→u, í→i, ñ→n, etc.)
+function normalizeForSearch(s: string): string {
+  return s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+}
+
 function daysInRange(startDate: string, endDate: string): number[] {
   const start = new Date(startDate + 'T00:00:00')
   const end   = new Date(endDate   + 'T00:00:00')
@@ -590,15 +595,15 @@ export default function FixtureTab({ tournamentId, startDate, endDate, zoneDays 
       .filter((s): s is string => !!s)
   )).sort((a, b) => a.localeCompare(b))
 
-  const q = playerQuery.trim().toLowerCase()
+  const q = normalizeForSearch(playerQuery.trim())
   const filtersActive = q !== '' || zoneFilter !== '__all__' || statusFilter !== '__all__'
 
   function matchesFilters(m: MatchResponse): boolean {
-    // Jugador (busca en los 4 nombres del partido)
+    // Jugador (busca en los 4 nombres del partido, ignorando acentos)
     if (q) {
       const names = [m.pair1?.player1, m.pair1?.player2, m.pair2?.player1, m.pair2?.player2]
         .filter((s): s is string => !!s)
-        .map((s) => s.toLowerCase())
+        .map((s) => normalizeForSearch(s))
       if (!names.some((n) => n.includes(q))) return false
     }
     // Zona
