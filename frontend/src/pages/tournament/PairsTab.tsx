@@ -284,13 +284,55 @@ function PairRow({ pair, idx, tournamentId, fixtureGenerated, allowedDays, onDel
   return (
     <Card>
       <CardContent className="py-3 px-4">
-        <div className="flex items-center gap-3">
-          <Badge variant="outline" className="text-orange-400 shrink-0 text-sm">Pareja #{idx + 1}</Badge>
-          <div className="flex-1 min-w-0">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
+          {/* Mobile: badge + acciones comparten fila (badge izq, meta der). Desktop: se disuelve y cada hijo va a su lugar */}
+          <div className="flex items-center justify-between gap-2 sm:contents">
+            <Badge variant="outline" className="text-orange-400 shrink-0 text-sm sm:order-first">
+              Pareja #{idx + 1}
+            </Badge>
+            <div className="flex items-center gap-2 shrink-0 sm:order-last">
+              {pair.constraints.length > 0 && (
+                <Badge
+                  variant="outline"
+                  className="text-xs border-muted-foreground/30 text-muted-foreground"
+                >
+                  <Clock size={10} className="mr-1" />
+                  {pair.constraints.length}
+                </Badge>
+              )}
+              <span className="text-xs text-muted-foreground whitespace-nowrap">{pair.totalPoints} pts</span>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-7 w-7 p-0 shrink-0"
+                onClick={() => setExpanded((v) => !v)}
+                title="Ver restricciones"
+              >
+                {expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+              </Button>
+              {isAdmin && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-7 w-7 p-0 shrink-0"
+                  onClick={() => {
+                    const msg = fixtureGenerated
+                      ? '¿Eliminar esta pareja?\n\nLas zonas y el fixture se borrarán y vas a tener que regenerarlos. Solo se puede antes de cargar resultados.'
+                      : '¿Eliminar esta pareja?'
+                    if (confirm(msg)) onDelete()
+                  }}
+                >
+                  <Trash2 size={14} className="text-destructive" />
+                </Button>
+              )}
+            </div>
+          </div>
+          {/* Nombres: ancho completo en mobile, columna central en desktop */}
+          <div className="min-w-0 sm:flex-1 sm:order-2">
             <div className="text-sm font-medium">
               {pair.players.map((p) => `${p.firstName} ${p.lastName}`).join(' / ')}
             </div>
-            <div className="flex gap-3 mt-0.5">
+            <div className="flex flex-col gap-0.5 mt-0.5 sm:flex-row sm:gap-3">
               {pair.players.map((p) => (
                 <span key={p.id} className="text-xs text-muted-foreground">
                   {p.firstName.split(' ')[0]}: {p.categoryName} ({p.points} pts)
@@ -298,40 +340,6 @@ function PairRow({ pair, idx, tournamentId, fixtureGenerated, allowedDays, onDel
               ))}
             </div>
           </div>
-          {pair.constraints.length > 0 && (
-            <Badge
-              variant="outline"
-              className="text-xs shrink-0 border-muted-foreground/30 text-muted-foreground"
-            >
-              <Clock size={10} className="mr-1" />
-              {pair.constraints.length}
-            </Badge>
-          )}
-          <span className="text-xs text-muted-foreground shrink-0">{pair.totalPoints} pts</span>
-          <Button
-            size="sm"
-            variant="ghost"
-            className="h-7 w-7 p-0 shrink-0"
-            onClick={() => setExpanded((v) => !v)}
-            title="Ver restricciones"
-          >
-            {expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-          </Button>
-          {isAdmin && (
-            <Button
-              size="sm"
-              variant="ghost"
-              className="h-7 w-7 p-0 shrink-0"
-              onClick={() => {
-                const msg = fixtureGenerated
-                  ? '¿Eliminar esta pareja?\n\nLas zonas y el fixture se borrarán y vas a tener que regenerarlos. Solo se puede antes de cargar resultados.'
-                  : '¿Eliminar esta pareja?'
-                if (confirm(msg)) onDelete()
-              }}
-            >
-              <Trash2 size={14} className="text-destructive" />
-            </Button>
-          )}
         </div>
         {expanded && (
           <ConstraintsSection pair={pair} tournamentId={tournamentId} locked={fixtureGenerated} allowedDays={allowedDays} />
