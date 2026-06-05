@@ -23,6 +23,7 @@ public class TournamentResponseDto {
     private Integer minIntervalMinutes;
     private TournamentStatus status;
     private boolean fixtureGenerated;   // true si ya se generó el fixture de zona
+    private boolean hasResults;         // true si hay al menos un partido con resultado cargado (PLAYED)
     private List<Integer> zoneDays;      // días de semana habilitados (1=Lun … 7=Dom), vacío = todos
     private LocalDateTime createdAt;
 }

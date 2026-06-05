@@ -15,6 +15,7 @@ export interface Tournament {
   minIntervalMinutes: number
   status: TournamentStatus
   fixtureGenerated: boolean
+  hasResults?: boolean        // true si hay al menos un partido con resultado cargado (PLAYED)
   zoneDays: number[]          // días habilitados para partidos (1=Lun … 7=Dom), vacío = todos
   createdAt: string
 }

@@ -21,6 +21,7 @@ import { cn } from '@/lib/utils'
 interface Props {
   tournamentId: number
   fixtureGenerated: boolean
+  hasResults: boolean  // true si ya hay resultados cargados → restricciones realmente bloqueadas
   startDate: string
   endDate: string
   zoneDays: number[]  // días configurados para partidos (1=Lun…7=Dom), vacío = usar rango de fechas
@@ -71,7 +72,10 @@ function formatTime(t: string) {
 
 // ── Sección de constraints de una pareja ────────────────────────────────────
 
-function ConstraintsSection({ pair, tournamentId, locked, allowedDays }: { pair: Pair; tournamentId: number; locked: boolean; allowedDays: number[] }) {
+function ConstraintsSection({ pair, tournamentId, fixtureGenerated, hasResults, allowedDays }: { pair: Pair; tournamentId: number; fixtureGenerated: boolean; hasResults: boolean; allowedDays: number[] }) {
+  // Solo se bloquea de verdad si ya hay resultados cargados.
+  // Si el fixture está generado pero sin resultados, se puede editar (y avisamos que hay que regenerarlo).
+  const locked = hasResults
   const qc = useQueryClient()
   const { isAdmin } = useAuth()
   const [open, setOpen] = useState(false)
@@ -91,6 +95,7 @@ function ConstraintsSection({ pair, tournamentId, locked, allowedDays }: { pair:
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['pairs', tournamentId] })
       toast.success('Restricción/preferencia agregada')
+      if (fixtureGenerated) toast.warning('El fixture ya está generado: regeneralo para aplicar este cambio', { duration: 7000 })
       setOpen(false)
       setDay('')
       setStart('')
@@ -104,6 +109,7 @@ function ConstraintsSection({ pair, tournamentId, locked, allowedDays }: { pair:
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['pairs', tournamentId] })
       toast.success('Eliminado')
+      if (fixtureGenerated) toast.warning('El fixture ya está generado: regeneralo para aplicar este cambio', { duration: 7000 })
     },
     onError: (error) => toast.error(apiErrorMessage(error, 'Error al eliminar')),
   })
@@ -130,7 +136,7 @@ function ConstraintsSection({ pair, tournamentId, locked, allowedDays }: { pair:
           Restricciones y preferencias
         </p>
         {locked ? (
-          <span className="text-xs text-muted-foreground italic">Bloqueado — fixture generado</span>
+          <span className="text-xs text-muted-foreground italic">Bloqueado — hay resultados cargados</span>
         ) : isAdmin ? (
           <Button size="sm" variant="outline" className="h-7 text-xs px-2" onClick={() => setOpen(true)}>
             <Plus size={12} className="mr-1" />
@@ -138,6 +144,14 @@ function ConstraintsSection({ pair, tournamentId, locked, allowedDays }: { pair:
           </Button>
         ) : null}
       </div>
+
+      {/* Aviso: si el fixture ya existe (sin resultados), editar restricciones obliga a regenerarlo */}
+      {!locked && fixtureGenerated && (
+        <p className="text-xs text-amber-500/90 flex items-start gap-1.5">
+          <Info size={12} className="shrink-0 mt-0.5" />
+          <span>El fixture ya está generado. Si cambiás restricciones, regeneralo desde la pestaña Fixture para que se apliquen.</span>
+        </p>
+      )}
 
       {pair.constraints.length === 0 ? (
         <p className="text-xs text-muted-foreground italic">Sin restricciones ni preferencias</p>
@@ -269,11 +283,12 @@ function ConstraintsSection({ pair, tournamentId, locked, allowedDays }: { pair:
 
 // ── Fila de pareja expandible ─────────────────────────────────────────────────
 
-function PairRow({ pair, idx, tournamentId, fixtureGenerated, allowedDays, onDelete }: {
+function PairRow({ pair, idx, tournamentId, fixtureGenerated, hasResults, allowedDays, onDelete }: {
   pair: Pair
   idx: number
   tournamentId: number
   fixtureGenerated: boolean
+  hasResults: boolean
   allowedDays: number[]
   onDelete: () => void
 }) {
@@ -342,7 +357,7 @@ function PairRow({ pair, idx, tournamentId, fixtureGenerated, allowedDays, onDel
           </div>
         </div>
         {expanded && (
-          <ConstraintsSection pair={pair} tournamentId={tournamentId} locked={fixtureGenerated} allowedDays={allowedDays} />
+          <ConstraintsSection pair={pair} tournamentId={tournamentId} fixtureGenerated={fixtureGenerated} hasResults={hasResults} allowedDays={allowedDays} />
         )}
       </CardContent>
     </Card>
@@ -521,7 +536,7 @@ interface PlayerSlot {
 
 const emptySlot: PlayerSlot = { playerId: '', categoryId: '', categories: [], loadingCats: false }
 
-export default function PairsTab({ tournamentId, fixtureGenerated, startDate, endDate, zoneDays }: Props) {
+export default function PairsTab({ tournamentId, fixtureGenerated, hasResults, startDate, endDate, zoneDays }: Props) {
   // Si hay días de zona configurados, usar esos. Si no, usar todos los días del rango del torneo.
   const allowedDays = zoneDays.length > 0 ? zoneDays : getTournamentDays(startDate, endDate)
   const qc = useQueryClient()
@@ -731,6 +746,7 @@ export default function PairsTab({ tournamentId, fixtureGenerated, startDate, en
               idx={idx}
               tournamentId={tournamentId}
               fixtureGenerated={fixtureGenerated}
+              hasResults={hasResults}
               allowedDays={allowedDays}
               onDelete={() => deleteMut.mutate(pair.id)}
             />

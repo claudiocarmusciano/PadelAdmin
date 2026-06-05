@@ -249,6 +249,7 @@ public class TournamentService {
                 .minIntervalMinutes(t.getMinIntervalMinutes())
                 .status(t.getStatus())
                 .fixtureGenerated(matchRepository.existsByTournamentId(t.getId()))
+                .hasResults(matchRepository.existsPlayedMatchesByTournamentId(t.getId()))
                 .zoneDays(new java.util.ArrayList<>(t.getZoneDays()))
                 .createdAt(t.getCreatedAt())
                 .build();

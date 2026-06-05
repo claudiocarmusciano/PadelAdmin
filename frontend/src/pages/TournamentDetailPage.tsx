@@ -122,7 +122,7 @@ export default function TournamentDetailPage() {
       {/* Tab content */}
       <Routes>
         <Route index element={<Navigate to={`/tournaments/${tournamentId}/pairs`} replace />} />
-        <Route path="pairs" element={<PairsTab tournamentId={tournamentId} fixtureGenerated={tournament.fixtureGenerated} startDate={tournament.startDate} endDate={tournament.endDate} zoneDays={tournament.zoneDays ?? []} />} />
+        <Route path="pairs" element={<PairsTab tournamentId={tournamentId} fixtureGenerated={tournament.fixtureGenerated} hasResults={tournament.hasResults ?? false} startDate={tournament.startDate} endDate={tournament.endDate} zoneDays={tournament.zoneDays ?? []} />} />
         <Route path="zones" element={<ZonesTab tournamentId={tournamentId} />} />
         <Route path="fixture" element={<FixtureTab tournamentId={tournamentId} startDate={tournament.startDate} endDate={tournament.endDate} zoneDays={tournament.zoneDays ?? []} />} />
         <Route path="calendar" element={<CalendarTab tournamentId={tournamentId} />} />

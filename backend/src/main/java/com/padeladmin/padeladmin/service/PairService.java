@@ -143,9 +143,9 @@ public class PairService {
                                                            PairScheduleConstraintRequestDto dto) {
         Pair pair = getPairOrThrow(tournamentId, pairId);
 
-        if (matchRepository.existsByTournamentId(tournamentId)) {
+        if (matchRepository.existsPlayedMatchesByTournamentId(tournamentId)) {
             throw new BusinessException(
-                    "No se pueden agregar restricciones: el fixture ya fue generado");
+                    "No se pueden agregar restricciones: ya hay resultados cargados");
         }
         if (dto.getSlotEnd().isBefore(dto.getSlotStart()) || dto.getSlotEnd().equals(dto.getSlotStart())) {
             throw new BusinessException("La hora de fin debe ser posterior a la hora de inicio");
@@ -165,9 +165,9 @@ public class PairService {
     @Transactional
     public void removeConstraint(Long tournamentId, Long pairId, Long constraintId) {
         getPairOrThrow(tournamentId, pairId);
-        if (matchRepository.existsByTournamentId(tournamentId)) {
+        if (matchRepository.existsPlayedMatchesByTournamentId(tournamentId)) {
             throw new BusinessException(
-                    "No se pueden eliminar restricciones: el fixture ya fue generado");
+                    "No se pueden eliminar restricciones: ya hay resultados cargados");
         }
         PairScheduleConstraint constraint = constraintRepository.findById(constraintId)
                 .orElseThrow(() -> new ResourceNotFoundException("Restricción", constraintId));
