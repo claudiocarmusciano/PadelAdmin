@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { CalendarDays, Play, Clock, CheckCircle, XCircle, AlertCircle, Pencil, Check, AlertTriangle } from 'lucide-react'
+import { CalendarDays, Play, Clock, CheckCircle, XCircle, AlertCircle, Pencil, Check, AlertTriangle, Search, X } from 'lucide-react'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 
@@ -501,6 +501,10 @@ export default function FixtureTab({ tournamentId, startDate, endDate, zoneDays 
   const [resultMatch, setResultMatch] = useState<MatchResponse | null>(null)
   const [courtMatch, setCourtMatch] = useState<MatchResponse | null>(null)
   const [selectedDays, setSelectedDays] = useState<number[]>(zoneDays)
+  // Filtros del fixture
+  const [playerQuery, setPlayerQuery] = useState('')
+  const [zoneFilter, setZoneFilter] = useState<string>('__all__')
+  const [statusFilter, setStatusFilter] = useState<string>('__all__')
 
   const availableDays = daysInRange(startDate, endDate)
 
@@ -575,10 +579,48 @@ export default function FixtureTab({ tournamentId, startDate, endDate, zoneDays 
     onError: (error) => toast.error(apiErrorMessage(error, 'Error al reordenar las zonas')),
   })
 
+  const allMatches = fixture?.matches ?? []
+
+  // Opciones de filtro derivadas de TODOS los partidos (no de los filtrados)
+  const zoneNames = Array.from(new Set(allMatches.filter((m) => m.zoneName).map((m) => m.zoneName!)))
+    .sort((a, b) => a.localeCompare(b))
+  const hasElimination = allMatches.some((m) => !m.zoneName)
+  const playerNames = Array.from(new Set(
+    allMatches.flatMap((m) => [m.pair1?.player1, m.pair1?.player2, m.pair2?.player1, m.pair2?.player2])
+      .filter((s): s is string => !!s)
+  )).sort((a, b) => a.localeCompare(b))
+
+  const q = playerQuery.trim().toLowerCase()
+  const filtersActive = q !== '' || zoneFilter !== '__all__' || statusFilter !== '__all__'
+
+  function matchesFilters(m: MatchResponse): boolean {
+    // Jugador (busca en los 4 nombres del partido)
+    if (q) {
+      const names = [m.pair1?.player1, m.pair1?.player2, m.pair2?.player1, m.pair2?.player2]
+        .filter((s): s is string => !!s)
+        .map((s) => s.toLowerCase())
+      if (!names.some((n) => n.includes(q))) return false
+    }
+    // Zona
+    if (zoneFilter === '__elim__') {
+      if (m.zoneName) return false
+    } else if (zoneFilter !== '__all__' && m.zoneName !== zoneFilter) {
+      return false
+    }
+    // Estado
+    if (statusFilter === 'scheduled' && !(m.status === 'SCHEDULED' || m.status === 'CONFIRMED')) return false
+    if (statusFilter === 'pending' && m.status !== 'PENDING') return false
+    if (statusFilter === 'played' && m.status !== 'PLAYED') return false
+    return true
+  }
+
   const zoneMatches = new Map<string, MatchResponse[]>()
   const eliminationMatches: MatchResponse[] = []
+  let filteredCount = 0
 
-  fixture?.matches.forEach((m) => {
+  allMatches.forEach((m) => {
+    if (!matchesFilters(m)) return
+    filteredCount++
     if (m.zoneName) {
       const key = m.zoneName
       if (!zoneMatches.has(key)) zoneMatches.set(key, [])
@@ -587,6 +629,12 @@ export default function FixtureTab({ tournamentId, startDate, endDate, zoneDays 
       eliminationMatches.push(m)
     }
   })
+
+  function clearFilters() {
+    setPlayerQuery('')
+    setZoneFilter('__all__')
+    setStatusFilter('__all__')
+  }
 
   return (
     <div className="space-y-4">
@@ -733,30 +781,110 @@ export default function FixtureTab({ tournamentId, startDate, endDate, zoneDays 
           </CardContent>
         </Card>
       ) : (
-        <div className="space-y-6">
-          {Array.from(zoneMatches.entries()).sort(([a], [b]) => a.localeCompare(b)).map(([zoneName, matches]) => (
-            <div key={zoneName}>
-              <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-2">
-                {zoneName}
-              </h3>
-              <div className="grid gap-2">
-                {matches.map((m) => (
-                  <MatchCard key={m.id} match={m} onResult={setResultMatch} onCourt={setCourtMatch} />
-                ))}
+        <div className="space-y-4">
+          {/* Barra de filtros */}
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:gap-3">
+            <div className="flex-1 min-w-0">
+              <Label className="text-xs">Buscar jugador</Label>
+              <div className="relative">
+                <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+                <Input
+                  list="fixture-players"
+                  value={playerQuery}
+                  onChange={(e) => setPlayerQuery(e.target.value)}
+                  placeholder="Nombre o apellido…"
+                  className="pl-8 pr-8"
+                />
+                <datalist id="fixture-players">
+                  {playerNames.map((n) => <option key={n} value={n} />)}
+                </datalist>
+                {playerQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setPlayerQuery('')}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    title="Limpiar"
+                  >
+                    <X size={14} />
+                  </button>
+                )}
               </div>
             </div>
-          ))}
+            <div className="w-full sm:w-40">
+              <Label className="text-xs">Zona</Label>
+              <Select value={zoneFilter} onValueChange={setZoneFilter}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__all__">Todas las zonas</SelectItem>
+                  {zoneNames.map((z) => <SelectItem key={z} value={z}>{z}</SelectItem>)}
+                  {hasElimination && <SelectItem value="__elim__">Eliminación</SelectItem>}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="w-full sm:w-40">
+              <Label className="text-xs">Estado</Label>
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__all__">Todos</SelectItem>
+                  <SelectItem value="scheduled">Programados</SelectItem>
+                  <SelectItem value="pending">Pendientes</SelectItem>
+                  <SelectItem value="played">Jugados</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            {filtersActive && (
+              <Button variant="ghost" size="sm" onClick={clearFilters} className="shrink-0">
+                <X size={14} className="mr-1" />
+                Limpiar
+              </Button>
+            )}
+          </div>
 
-          {eliminationMatches.length > 0 && (
-            <div>
-              <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-2">
-                Eliminación
-              </h3>
-              <div className="grid gap-2">
-                {eliminationMatches.map((m) => (
-                  <MatchCard key={m.id} match={m} onResult={setResultMatch} onCourt={setCourtMatch} />
-                ))}
-              </div>
+          {filtersActive && (
+            <p className="text-xs text-muted-foreground">
+              {filteredCount} {filteredCount === 1 ? 'partido coincide' : 'partidos coinciden'} con el filtro
+            </p>
+          )}
+
+          {filteredCount === 0 ? (
+            <Card>
+              <CardContent className="flex flex-col items-center justify-center py-12 gap-3">
+                <Search size={28} className="text-muted-foreground" />
+                <p className="text-sm font-medium">Ningún partido coincide con el filtro</p>
+                <Button variant="outline" size="sm" onClick={clearFilters}>
+                  <X size={14} className="mr-1" />
+                  Limpiar filtros
+                </Button>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="space-y-6">
+              {Array.from(zoneMatches.entries()).sort(([a], [b]) => a.localeCompare(b)).map(([zoneName, matches]) => (
+                <div key={zoneName}>
+                  <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+                    {zoneName}
+                  </h3>
+                  <div className="grid gap-2">
+                    {matches.map((m) => (
+                      <MatchCard key={m.id} match={m} onResult={setResultMatch} onCourt={setCourtMatch} />
+                    ))}
+                  </div>
+                </div>
+              ))}
+
+              {eliminationMatches.length > 0 && (
+                <div>
+                  <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+                    Eliminación
+                  </h3>
+                  <div className="grid gap-2">
+                    {eliminationMatches.map((m) => (
+                      <MatchCard key={m.id} match={m} onResult={setResultMatch} onCourt={setCourtMatch} />
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
