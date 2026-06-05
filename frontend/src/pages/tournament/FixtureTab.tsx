@@ -596,8 +596,11 @@ export default function FixtureTab({ tournamentId, startDate, endDate, zoneDays 
           zoneDaysEmpty ? 'border-amber-500/40' : zoneDaysDirty ? 'border-primary/50' : 'border-border'
         }`}>
           <div className="flex-1 min-w-0">
-            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">
-              Días en que se juegan los partidos de zona
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">
+              Días en que se juegan los partidos
+            </p>
+            <p className="text-xs text-muted-foreground mb-2">
+              Marcá los días habilitados. <strong>Deseleccionar un día lo bloquea para todas las parejas</strong> (no se programa nada ese día, ni zona ni eliminatoria).
             </p>
             <div className="flex gap-1.5 flex-wrap">
               {ALL_DAYS.filter((d) => availableDays.includes(d.value)).map((d) => (
@@ -609,6 +612,9 @@ export default function FixtureTab({ tournamentId, startDate, endDate, zoneDays 
                       ? 'bg-primary text-primary-foreground border-primary'
                       : 'bg-transparent text-muted-foreground border-border hover:border-primary/50'
                   }`}
+                  title={selectedDays.includes(d.value)
+                    ? `${d.label} habilitado — hacé click para bloquearlo para todas las parejas`
+                    : `${d.label} bloqueado para todas las parejas — hacé click para habilitarlo`}
                 >
                   {d.label}
                 </button>

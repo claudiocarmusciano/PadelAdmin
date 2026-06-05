@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { Plus, Trash2, Users, ChevronDown, ChevronUp, Clock, Ban, Star, UserPlus } from 'lucide-react'
+import { Plus, Trash2, Users, ChevronDown, ChevronUp, Clock, Ban, Star, UserPlus, Info } from 'lucide-react'
 import { getPairs, createPair, deletePair, addConstraint, deleteConstraint } from '@/api/pairs'
 import { apiErrorMessage } from '@/lib/axios'
 import { useAuth } from '@/contexts/AuthContext'
@@ -178,6 +178,15 @@ function ConstraintsSection({ pair, tournamentId, locked, allowedDays }: { pair:
             <DialogTitle>Nueva restricción / preferencia</DialogTitle>
           </DialogHeader>
           <div className="grid gap-4 py-2">
+            {/* Nota: bloqueo de día completo para TODAS las parejas */}
+            <div className="flex items-start gap-2 p-2.5 rounded-md bg-sky-400/10 border border-sky-400/30 text-xs">
+              <Info size={13} className="text-sky-400 shrink-0 mt-0.5" />
+              <span className="text-sky-300">
+                ¿Querés bloquear un día completo para <strong>todas</strong> las parejas (ej: que nadie juegue el viernes)?
+                Hacelo desde la pestaña <strong>Fixture → "Días en que se juegan los partidos"</strong>, deseleccionando ese día.
+                Acá configurás solo la restricción de <strong>esta</strong> pareja.
+              </span>
+            </div>
             {/* Tipo */}
             <div className="grid gap-1.5">
               <Label>Tipo</Label>
