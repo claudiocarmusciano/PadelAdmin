@@ -54,11 +54,15 @@ const DAYS = [
   { value: 7, label: 'Domingo' },
 ]
 
-const TIME_SLOTS = [
-  '07:00', '08:00', '09:00', '10:00', '11:00', '12:00',
-  '13:00', '14:00', '15:00', '16:00', '17:00', '18:00',
-  '19:00', '20:00', '21:00', '22:00',
-]
+// Horas seleccionables para restricciones/preferencias — cada 30 min (07:00 a 23:00)
+const TIME_SLOTS: string[] = (() => {
+  const out: string[] = []
+  for (let h = 7; h <= 23; h++) {
+    out.push(`${String(h).padStart(2, '0')}:00`)
+    if (h < 23) out.push(`${String(h).padStart(2, '0')}:30`)
+  }
+  return out
+})()
 
 function formatTime(t: string) {
   // backend returns "HH:mm:ss", show only "HH:mm"
