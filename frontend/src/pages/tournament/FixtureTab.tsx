@@ -329,12 +329,16 @@ function CourtDialog({
         ) : (
           <div className="grid gap-1.5">
             <Label className="text-xs text-muted-foreground">Cancha</Label>
-            <Select value={selectedCourtId} onValueChange={setSelectedCourtId}>
+            <Select
+              value={selectedCourtId}
+              onValueChange={(v) => setSelectedCourtId(v === '__none__' ? '' : v)}
+            >
               <SelectTrigger>
                 <SelectValue placeholder="Sin cancha asignada" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Sin cancha</SelectItem>
+                {/* Radix no permite value="" en un SelectItem → centinela */}
+                <SelectItem value="__none__">Sin cancha</SelectItem>
                 {complexes.map((complex) => (
                   <SelectGroup key={complex.id}>
                     <SelectLabel>{complex.name}</SelectLabel>
