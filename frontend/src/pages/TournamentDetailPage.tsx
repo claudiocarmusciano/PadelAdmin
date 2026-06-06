@@ -100,7 +100,7 @@ export default function TournamentDetailPage() {
       </div>
 
       {/* Tabs */}
-      <div className="border-b flex gap-1 overflow-x-auto -mx-4 md:mx-0 px-4 md:px-0">
+      <div className="border-b flex gap-1 overflow-x-auto overflow-y-hidden overscroll-x-contain touch-pan-x -mx-4 md:mx-0 px-4 md:px-0">
         {tabs.map(({ path, label }) => (
           <NavLink
             key={path}
