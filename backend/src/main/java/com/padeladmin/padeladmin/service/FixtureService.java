@@ -300,7 +300,85 @@ public class FixtureService {
             log.info("   • pareja {} vs pareja {} → {} slots compatibles", p1, p2, compat);
         }
 
-        // Stats de diagnóstico
+        // ── 1) BACKTRACKING: buscar una asignación COMPLETA (0 pendientes) ──
+        // Las hard constraints son obligatorias; las preferencias se usan como heurística de
+        // orden (se prueban primero los slots que las respetan). Tope de tiempo para no colgar.
+        long deadline = System.nanoTime() + BACKTRACK_BUDGET_NANOS;
+        boolean solved = backtrack(ordered, 0, slots, courtMap, tournament, constraintsByPairId, scheduled, deadline);
+        if (solved) {
+            log.info("Scheduling (backtracking): solución COMPLETA — 0 pendientes ({} partidos)", ordered.size());
+            return;
+        }
+
+        // ── 2) Sin solución completa (o se agotó el tiempo) → greedy best-effort ──
+        log.info("Scheduling: el backtracking no halló solución completa; uso greedy (programa lo que pueda)");
+        for (Match m : ordered) {
+            m.setStatus(MatchStatus.PENDING);
+            m.setScheduledStart(null);
+            m.setScheduledEnd(null);
+            m.setCourt(null);
+        }
+        greedySchedule(ordered, slots, courtMap, tournament, constraintsByPairId,
+                new ArrayList<>(alreadyScheduled));
+    }
+
+    /** Presupuesto de tiempo del backtracking antes de caer al greedy. */
+    private static final long BACKTRACK_BUDGET_NANOS = 3_000_000_000L; // 3 segundos
+
+    /**
+     * Backtracking con la ordenación MRV ya aplicada (más restringidos primero) y forward-checking.
+     * Intenta asignar TODOS los partidos a un slot válido (solo hard constraints), probando primero
+     * los slots que respetan las preferencias. Devuelve true si logró una asignación completa; si no
+     * (o si se agota el deadline), revierte todo y devuelve false.
+     */
+    private boolean backtrack(List<Match> ordered, int idx, List<TimeSlot> slots,
+                              Map<Long, Court> courtMap, Tournament tournament,
+                              Map<Long, List<PairScheduleConstraint>> cons,
+                              List<Match> scheduled, long deadline) {
+        if (idx == ordered.size()) return true;
+        if (System.nanoTime() > deadline) return false;
+
+        Match match = ordered.get(idx);
+        boolean hasPrefs = hasAnyPreference(match, cons);
+
+        // Candidatos válidos por hard constraints; los que cumplen preferencias van primero
+        List<TimeSlot> preferred = new ArrayList<>();
+        List<TimeSlot> others = new ArrayList<>();
+        for (TimeSlot slot : slots) {
+            if (!isValidSlot(match, slot, scheduled, tournament, cons, false)) continue;
+            if (hasPrefs && isValidSlot(match, slot, scheduled, tournament, cons, true)) preferred.add(slot);
+            else others.add(slot);
+        }
+
+        for (List<TimeSlot> bucket : List.of(preferred, others)) {
+            for (TimeSlot slot : bucket) {
+                match.setScheduledStart(LocalDateTime.of(slot.getDate(), slot.getStartTime()));
+                match.setScheduledEnd(LocalDateTime.of(slot.getDate(), slot.getEndTime()));
+                match.setCourt(courtMap.get(slot.getCourtId()));
+                match.setStatus(MatchStatus.SCHEDULED);
+                scheduled.add(match);
+
+                if (backtrack(ordered, idx + 1, slots, courtMap, tournament, cons, scheduled, deadline)) {
+                    return true;
+                }
+
+                // revertir
+                scheduled.remove(scheduled.size() - 1);
+                match.setScheduledStart(null);
+                match.setScheduledEnd(null);
+                match.setCourt(null);
+                match.setStatus(MatchStatus.PENDING);
+
+                if (System.nanoTime() > deadline) return false;
+            }
+        }
+        return false;
+    }
+
+    /** Greedy best-effort (fallback): a cada partido le asigna el primer slot válido, sin deshacer. */
+    private void greedySchedule(List<Match> ordered, List<TimeSlot> slots, Map<Long, Court> courtMap,
+                                Tournament tournament, Map<Long, List<PairScheduleConstraint>> constraintsByPairId,
+                                List<Match> scheduled) {
         int satisfiedWithPrefs = 0;
         int relaxedFromPrefs = 0;
         int unscheduled = 0;
@@ -359,7 +437,7 @@ public class FixtureService {
             }
         }
 
-        log.info("Scheduling: {} respetando preferencias · {} con preferencia relajada · {} pendientes",
+        log.info("Scheduling (greedy): {} respetando preferencias · {} con preferencia relajada · {} pendientes",
                 satisfiedWithPrefs, relaxedFromPrefs, unscheduled);
     }
 
