@@ -42,6 +42,9 @@ public class CourtAvailabilityService {
             throw new BusinessException("La hora de cierre debe ser posterior a la de apertura");
         }
 
+        // Validación del pulmón horario (opcional)
+        validateBreak(dto.getBreakStart(), dto.getBreakEnd(), dto.getOpenTime(), dto.getCloseTime());
+
         // Si ya existe para ese día, actualiza; si no, crea
         CourtAvailability availability = availabilityRepository
                 .findByCourtIdAndDayOfWeek(courtId, dto.getDayOfWeek())
@@ -50,8 +53,25 @@ public class CourtAvailabilityService {
         availability.setDayOfWeek(dto.getDayOfWeek());
         availability.setOpenTime(dto.getOpenTime());
         availability.setCloseTime(dto.getCloseTime());
+        availability.setBreakStart(dto.getBreakStart());
+        availability.setBreakEnd(dto.getBreakEnd());
 
         return toDto(availabilityRepository.save(availability));
+    }
+
+    /** Valida el pulmón opcional: o ambos null, o una franja válida dentro del horario. */
+    private void validateBreak(java.time.LocalTime breakStart, java.time.LocalTime breakEnd,
+                               java.time.LocalTime openTime, java.time.LocalTime closeTime) {
+        if (breakStart == null && breakEnd == null) return; // sin pulmón
+        if (breakStart == null || breakEnd == null) {
+            throw new BusinessException("El pulmón horario necesita hora de inicio y de fin");
+        }
+        if (!breakEnd.isAfter(breakStart)) {
+            throw new BusinessException("El fin del pulmón debe ser posterior a su inicio");
+        }
+        if (breakStart.isBefore(openTime) || breakEnd.isAfter(closeTime)) {
+            throw new BusinessException("El pulmón horario debe estar dentro del horario de la cancha");
+        }
     }
 
     /**
@@ -86,6 +106,8 @@ public class CourtAvailabilityService {
                         .dayOfWeek(src.getDayOfWeek())
                         .openTime(src.getOpenTime())
                         .closeTime(src.getCloseTime())
+                        .breakStart(src.getBreakStart())
+                        .breakEnd(src.getBreakEnd())
                         .build());
             }
         }
@@ -115,6 +137,8 @@ public class CourtAvailabilityService {
                 .dayName(DAY_NAMES[a.getDayOfWeek()])
                 .openTime(a.getOpenTime())
                 .closeTime(a.getCloseTime())
+                .breakStart(a.getBreakStart())
+                .breakEnd(a.getBreakEnd())
                 .build();
     }
 }

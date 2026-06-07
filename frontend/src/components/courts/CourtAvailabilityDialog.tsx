@@ -40,10 +40,16 @@ interface DayRow {
   enabled: boolean
   openTime: string  // "HH:mm"
   closeTime: string // "HH:mm"
+  breakEnabled: boolean       // pulmón horario opcional
+  breakStart: string          // "HH:mm"
+  breakEnd: string            // "HH:mm"
   existingId?: number
 }
 
-const emptyRow: DayRow = { enabled: false, openTime: '16:00', closeTime: '23:00' }
+const emptyRow: DayRow = {
+  enabled: false, openTime: '16:00', closeTime: '23:00',
+  breakEnabled: false, breakStart: '16:00', breakEnd: '17:00',
+}
 
 interface Props {
   courtId: number | null
@@ -72,9 +78,17 @@ export function CourtAvailabilityDialog({ courtId, courtName, onClose }: Props) 
     data.forEach((a) => byDay.set(a.dayOfWeek, a))
     setRows(DAYS.map(({ value }) => {
       const found = byDay.get(value)
-      return found
-        ? { enabled: true, openTime: hhmm(found.openTime), closeTime: hhmm(found.closeTime), existingId: found.id }
-        : { ...emptyRow }
+      if (!found) return { ...emptyRow }
+      const hasBreak = !!found.breakStart && !!found.breakEnd
+      return {
+        enabled: true,
+        openTime: hhmm(found.openTime),
+        closeTime: hhmm(found.closeTime),
+        breakEnabled: hasBreak,
+        breakStart: hasBreak ? hhmm(found.breakStart!) : '16:00',
+        breakEnd: hasBreak ? hhmm(found.breakEnd!) : '17:00',
+        existingId: found.id,
+      }
     }))
   }, [data, courtId])
 
@@ -85,7 +99,7 @@ export function CourtAvailabilityDialog({ courtId, courtName, onClose }: Props) 
   }, [courtId])
 
   const upsertMut = useMutation({
-    mutationFn: (args: { dayOfWeek: number; openTime: string; closeTime: string }) =>
+    mutationFn: (args: { dayOfWeek: number; openTime: string; closeTime: string; breakStart?: string | null; breakEnd?: string | null }) =>
       upsertCourtAvailability(courtId!, args),
   })
 
@@ -105,7 +119,15 @@ export function CourtAvailabilityDialog({ courtId, courtName, onClose }: Props) 
       toast.error('Activá al menos un día para copiarlo a los demás')
       return
     }
-    setRows((prev) => prev.map((r) => ({ ...r, enabled: true, openTime: source.openTime, closeTime: source.closeTime })))
+    setRows((prev) => prev.map((r) => ({
+      ...r,
+      enabled: true,
+      openTime: source.openTime,
+      closeTime: source.closeTime,
+      breakEnabled: source.breakEnabled,
+      breakStart: source.breakStart,
+      breakEnd: source.breakEnd,
+    })))
     toast.success('Aplicado a todos los días')
   }
 
@@ -120,6 +142,16 @@ export function CourtAvailabilityDialog({ courtId, courtName, onClose }: Props) 
         toast.error(`${DAYS[i].label}: la apertura debe ser antes del cierre`)
         return false
       }
+      if (r.enabled && r.breakEnabled) {
+        if (r.breakStart >= r.breakEnd) {
+          toast.error(`${DAYS[i].label}: el pulmón debe terminar después de empezar`)
+          return false
+        }
+        if (r.breakStart < r.openTime || r.breakEnd > r.closeTime) {
+          toast.error(`${DAYS[i].label}: el pulmón debe estar dentro del horario de la cancha`)
+          return false
+        }
+      }
     }
     try {
       const tasks: Promise<unknown>[] = []
@@ -130,6 +162,8 @@ export function CourtAvailabilityDialog({ courtId, courtName, onClose }: Props) 
             dayOfWeek: DAYS[i].value,
             openTime: r.openTime + ':00',
             closeTime: r.closeTime + ':00',
+            breakStart: r.breakEnabled ? r.breakStart + ':00' : null,
+            breakEnd: r.breakEnabled ? r.breakEnd + ':00' : null,
           }))
         } else if (r.existingId) {
           tasks.push(deleteMut.mutateAsync(r.existingId))
@@ -205,50 +239,90 @@ export function CourtAvailabilityDialog({ courtId, courtName, onClose }: Props) 
                 return (
                   <div
                     key={value}
-                    className={`flex items-center gap-2 px-2.5 py-2 rounded-md border ${
+                    className={`flex flex-col gap-1.5 px-2.5 py-2 rounded-md border ${
                       r.enabled ? 'border-primary/40 bg-primary/5' : 'border-border bg-background'
                     }`}
                   >
-                    <label className="flex items-center gap-1.5 cursor-pointer w-[88px] shrink-0">
-                      <input
-                        type="checkbox"
-                        checked={r.enabled}
-                        onChange={(e) => updateRow(idx, { enabled: e.target.checked })}
-                        className="h-4 w-4 accent-primary cursor-pointer shrink-0"
-                      />
-                      <span className="text-sm font-medium truncate">{label}</span>
-                    </label>
-                    <div className="flex-1 min-w-0 flex items-center gap-1.5">
-                      <Select
-                        value={r.openTime}
-                        onValueChange={(v) => updateRow(idx, { openTime: v })}
-                        disabled={!r.enabled}
-                      >
-                        <SelectTrigger className="h-8 text-sm min-w-0 flex-1 px-2 tabular-nums">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {TIME_OPTIONS.map((t) => (
-                            <SelectItem key={t} value={t}>{t}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <span className="text-xs text-muted-foreground shrink-0">a</span>
-                      <Select
-                        value={r.closeTime}
-                        onValueChange={(v) => updateRow(idx, { closeTime: v })}
-                        disabled={!r.enabled}
-                      >
-                        <SelectTrigger className="h-8 text-sm min-w-0 flex-1 px-2 tabular-nums">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {TIME_OPTIONS.map((t) => (
-                            <SelectItem key={t} value={t}>{t}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                    <div className="flex items-center gap-2">
+                      <label className="flex items-center gap-1.5 cursor-pointer w-[88px] shrink-0">
+                        <input
+                          type="checkbox"
+                          checked={r.enabled}
+                          onChange={(e) => updateRow(idx, { enabled: e.target.checked })}
+                          className="h-4 w-4 accent-primary cursor-pointer shrink-0"
+                        />
+                        <span className="text-sm font-medium truncate">{label}</span>
+                      </label>
+                      <div className="flex-1 min-w-0 flex items-center gap-1.5">
+                        <Select
+                          value={r.openTime}
+                          onValueChange={(v) => updateRow(idx, { openTime: v })}
+                          disabled={!r.enabled}
+                        >
+                          <SelectTrigger className="h-8 text-sm min-w-0 flex-1 px-2 tabular-nums">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {TIME_OPTIONS.map((t) => (
+                              <SelectItem key={t} value={t}>{t}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <span className="text-xs text-muted-foreground shrink-0">a</span>
+                        <Select
+                          value={r.closeTime}
+                          onValueChange={(v) => updateRow(idx, { closeTime: v })}
+                          disabled={!r.enabled}
+                        >
+                          <SelectTrigger className="h-8 text-sm min-w-0 flex-1 px-2 tabular-nums">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {TIME_OPTIONS.map((t) => (
+                              <SelectItem key={t} value={t}>{t}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
                     </div>
+
+                    {/* Pulmón horario opcional (solo si el día está habilitado) */}
+                    {r.enabled && (
+                      <div className="flex items-center gap-2 pl-[2px]">
+                        <label className="flex items-center gap-1.5 cursor-pointer w-[88px] shrink-0">
+                          <input
+                            type="checkbox"
+                            checked={r.breakEnabled}
+                            onChange={(e) => updateRow(idx, { breakEnabled: e.target.checked })}
+                            className="h-3.5 w-3.5 accent-amber-500 cursor-pointer shrink-0"
+                          />
+                          <span className="text-xs text-muted-foreground truncate">Pulmón</span>
+                        </label>
+                        {r.breakEnabled ? (
+                          <div className="flex-1 min-w-0 flex items-center gap-1.5">
+                            <Select value={r.breakStart} onValueChange={(v) => updateRow(idx, { breakStart: v })}>
+                              <SelectTrigger className="h-7 text-xs min-w-0 flex-1 px-2 tabular-nums">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {TIME_OPTIONS.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                              </SelectContent>
+                            </Select>
+                            <span className="text-xs text-muted-foreground shrink-0">a</span>
+                            <Select value={r.breakEnd} onValueChange={(v) => updateRow(idx, { breakEnd: v })}>
+                              <SelectTrigger className="h-7 text-xs min-w-0 flex-1 px-2 tabular-nums">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {TIME_OPTIONS.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        ) : (
+                          <span className="text-xs text-muted-foreground/70 italic">sin pulmón — no se programan partidos en esa franja</span>
+                        )}
+                      </div>
+                    )}
                   </div>
                 )
               })}

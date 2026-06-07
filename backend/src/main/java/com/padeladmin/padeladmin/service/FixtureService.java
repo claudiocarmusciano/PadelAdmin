@@ -239,11 +239,16 @@ public class FixtureService {
 
         LocalTime cursor = availability.getOpenTime();
         LocalTime closeTime = availability.getCloseTime();
+        // Pulmón horario de esta cancha+día (opcional): ningún slot puede solaparlo
+        LocalTime breakStart = availability.getBreakStart();
+        LocalTime breakEnd = availability.getBreakEnd();
+        boolean hasBreak = breakStart != null && breakEnd != null;
 
         while (!cursor.isAfter(closeTime.minusMinutes(matchDurationMinutes))) {
             LocalTime slotEnd = cursor.plusMinutes(matchDurationMinutes);
 
-            if (!overlapsAnyBuffer(cursor, slotEnd, dayBuffers)) {
+            boolean inBreak = hasBreak && timesOverlap(cursor, slotEnd, breakStart, breakEnd);
+            if (!overlapsAnyBuffer(cursor, slotEnd, dayBuffers) && !inBreak) {
                 slots.add(TimeSlot.builder()
                         .date(date)
                         .startTime(cursor)
@@ -426,7 +431,7 @@ public class FixtureService {
 
         // 3b. Orden de rondas en zona de 4: la Ronda 2 (gan/per) debe ir DESPUÉS de la
         // Ronda 1 de sus parejas + el intervalo mínimo (comparando fecha y hora completas).
-        if (violatesZoneRoundOrder(match, slot, scheduled, minInterval)) return false;
+        if (violatesZoneRoundOrder(match, slot, scheduled)) return false;
 
         // 4. Restricciones y preferencias: solo aplican a partidos de zona
         if (match.getPhase() == MatchPhase.ZONE) {
@@ -472,31 +477,25 @@ public class FixtureService {
     private boolean violatesMinInterval(Long pairId, TimeSlot slot, List<Match> scheduled, int minIntervalMinutes) {
         LocalDate slotDate = slot.getDate();
         LocalTime slotStart = slot.getStartTime();
-        LocalTime slotEnd = slot.getEndTime();
 
         return scheduled.stream()
                 .filter(m -> involvesPair(m, pairId)
                         && m.getScheduledStart().toLocalDate().equals(slotDate))
                 .anyMatch(m -> {
-                    LocalTime prevEnd = m.getScheduledEnd().toLocalTime();
                     LocalTime prevStart = m.getScheduledStart().toLocalTime();
-                    // El nuevo slot empieza demasiado cerca del final de un partido anterior
-                    // Usamos !isBefore para cubrir también el caso slotStart == prevEnd (back-to-back)
-                    boolean tooCloseAfter = !slotStart.isBefore(prevEnd)
-                            && slotStart.isBefore(prevEnd.plusMinutes(minIntervalMinutes));
-                    // Un partido ya programado empieza demasiado cerca del final del nuevo slot
-                    boolean tooCloseBefore = !prevStart.isBefore(slotEnd)
-                            && prevStart.isBefore(slotEnd.plusMinutes(minIntervalMinutes));
-                    return tooCloseAfter || tooCloseBefore;
+                    // Intervalo mínimo medido de INICIO a INICIO entre partidos de la misma pareja.
+                    // Ej: intervalo 120 → si juega 10:00, el siguiente no puede empezar antes de 12:00.
+                    long diffMinutes = Math.abs(slotStart.toSecondOfDay() - prevStart.toSecondOfDay()) / 60L;
+                    return diffMinutes < minIntervalMinutes;
                 });
     }
 
     /**
-     * En zonas de 4, la Ronda 2 (ganadores / perdedores) debe jugarse DESPUÉS de la Ronda 1.
-     * El slot candidato debe empezar a la hora del fin de la R1 de cualquiera de sus parejas
-     * más el intervalo mínimo (comparando fecha + hora completas, así también vale entre días).
+     * En zonas de 4, la Ronda 2 (ganadores / perdedores) debe jugarse DESPUÉS de que termine la
+     * Ronda 1 de sus parejas (orden correcto, sin solape; vale también entre días). El intervalo
+     * mínimo inicio-a-inicio entre partidos de la pareja lo garantiza violatesMinInterval.
      */
-    private boolean violatesZoneRoundOrder(Match match, TimeSlot slot, List<Match> scheduled, int minIntervalMinutes) {
+    private boolean violatesZoneRoundOrder(Match match, TimeSlot slot, List<Match> scheduled) {
         Integer round = match.getZoneRound();
         if (match.getPhase() != MatchPhase.ZONE || round == null) return false;
 
@@ -508,7 +507,7 @@ public class FixtureService {
                 .filter(m -> m.getZoneRound() != null && m.getZoneRound() < round) // rondas previas de la zona
                 .filter(m -> m.getScheduledEnd() != null)
                 .filter(m -> involvesPair(m, p1) || (p2 != null && involvesPair(m, p2)))
-                .anyMatch(m -> slotStart.isBefore(m.getScheduledEnd().plusMinutes(minIntervalMinutes)));
+                .anyMatch(m -> slotStart.isBefore(m.getScheduledEnd()));
     }
 
     private boolean violatesRestriction(TimeSlot slot, List<PairScheduleConstraint> constraints) {

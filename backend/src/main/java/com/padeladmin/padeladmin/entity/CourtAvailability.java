@@ -30,4 +30,12 @@ public class CourtAvailability {
 
     @Column(name = "close_time", nullable = false)
     private LocalTime closeTime;
+
+    // Pulmón horario opcional: franja dentro del horario de la cancha donde NO se programan
+    // partidos (ej: 16:00–17:00). Ambos null = sin pulmón.
+    @Column(name = "break_start")
+    private LocalTime breakStart;
+
+    @Column(name = "break_end")
+    private LocalTime breakEnd;
 }

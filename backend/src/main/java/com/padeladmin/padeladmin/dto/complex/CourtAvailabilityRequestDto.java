@@ -20,4 +20,8 @@ public class CourtAvailabilityRequestDto {
 
     @NotNull(message = "La hora de cierre es obligatoria")
     private LocalTime closeTime;
+
+    // Pulmón horario opcional (ambos null = sin pulmón)
+    private LocalTime breakStart;
+    private LocalTime breakEnd;
 }

@@ -6,6 +6,8 @@ export interface CourtAvailability {
   dayName: string
   openTime: string  // "HH:mm" o "HH:mm:ss"
   closeTime: string
+  breakStart?: string | null  // pulmón horario opcional
+  breakEnd?: string | null
 }
 
 export const getCourtAvailability = async (courtId: number): Promise<CourtAvailability[]> => {
@@ -15,7 +17,7 @@ export const getCourtAvailability = async (courtId: number): Promise<CourtAvaila
 
 export const upsertCourtAvailability = async (
   courtId: number,
-  dto: { dayOfWeek: number; openTime: string; closeTime: string }
+  dto: { dayOfWeek: number; openTime: string; closeTime: string; breakStart?: string | null; breakEnd?: string | null }
 ): Promise<CourtAvailability> => {
   const { data } = await api.post(`/courts/${courtId}/availability`, dto)
   return data

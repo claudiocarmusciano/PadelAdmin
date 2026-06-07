@@ -13,4 +13,6 @@ public class CourtAvailabilityResponseDto {
     private String dayName;
     private LocalTime openTime;
     private LocalTime closeTime;
+    private LocalTime breakStart;   // pulmón opcional
+    private LocalTime breakEnd;
 }
