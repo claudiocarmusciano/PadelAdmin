@@ -650,7 +650,7 @@ export default function FixtureTab({ tournamentId, startDate, endDate, zoneDays 
         }`}>
           <div className="flex-1 min-w-0">
             <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">
-              Días en que se juegan los partidos
+              Días en que se juegan los partidos de zona
             </p>
             <p className="text-xs text-muted-foreground mb-2">
               Marcá los días habilitados. <strong>Deseleccionar un día lo bloquea para todas las parejas</strong> (no se programa nada ese día, ni zona ni eliminatoria).

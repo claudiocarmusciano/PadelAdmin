@@ -200,7 +200,7 @@ function ConstraintsSection({ pair, tournamentId, fixtureGenerated, hasResults, 
               <Info size={13} className="text-sky-400 shrink-0 mt-0.5" />
               <span className="text-sky-300">
                 ¿Querés bloquear un día completo para <strong>todas</strong> las parejas (ej: que nadie juegue el viernes)?
-                Hacelo desde la pestaña <strong>Fixture → "Días en que se juegan los partidos"</strong>, deseleccionando ese día.
+                Hacelo desde la pestaña <strong>Fixture → "Días en que se juegan los partidos de zona"</strong>, deseleccionando ese día.
                 Acá configurás solo la restricción de <strong>esta</strong> pareja.
               </span>
             </div>
