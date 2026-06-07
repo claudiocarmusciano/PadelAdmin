@@ -164,6 +164,12 @@ public class MatchResultService {
             round2Created = tryCreateRound2(match.getZone(), match.getTournament());
         }
 
+        // Si se cargó/editó un resultado de ZONA y existe un bracket que todavía no empezó,
+        // lo invalidamos para que se regenere con la clasificación corregida.
+        if (match.getPhase() == MatchPhase.ZONE) {
+            eliminationService.invalidateBracketIfNotStarted(match.getTournament().getId());
+        }
+
         // Fase eliminatoria: avanzar el ganador al siguiente partido del bracket
         if (match.getPhase() == MatchPhase.ELIMINATION) {
             eliminationService.advanceWinner(match, winner);

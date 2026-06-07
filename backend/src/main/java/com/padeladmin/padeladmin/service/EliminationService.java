@@ -324,6 +324,25 @@ public class EliminationService {
         return ord + " Zona " + info.zoneName();
     }
 
+    /**
+     * Si existe un bracket eliminatorio que TODAVÍA NO empezó (ningún partido real jugado),
+     * lo borra para que se regenere con la clasificación corregida (ej: al editar un resultado
+     * de zona). Si el bracket ya tiene resultados cargados, no se toca (no se pisa el progreso).
+     */
+    @Transactional
+    public void invalidateBracketIfNotStarted(Long tournamentId) {
+        List<Match> elim = matchRepository.findByTournamentIdAndPhase(tournamentId, MatchPhase.ELIMINATION);
+        if (elim.isEmpty()) return;
+        // Un partido con BYE se crea como PLAYED (avance automático): no cuenta como "empezado".
+        boolean started = elim.stream().anyMatch(m -> m.getStatus() == MatchStatus.PLAYED && !m.isBye());
+        if (started) {
+            log.info("Bracket del torneo {} ya tiene resultados: no se regenera automáticamente", tournamentId);
+            return;
+        }
+        matchRepository.deleteAll(elim);
+        log.info("Bracket del torneo {} invalidado por cambio en resultados de zona (se regenerará al verlo)", tournamentId);
+    }
+
     /** true si el torneo tiene zonas y TODOS sus partidos de zona están jugados (PLAYED). */
     private boolean allZonesComplete(Long tournamentId) {
         List<Zone> zones = zoneRepository.findByTournamentIdOrderByZoneOrder(tournamentId);
