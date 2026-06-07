@@ -158,6 +158,7 @@ public class EliminationService {
 
     // ── Ver bracket actual ────────────────────────────────────────────────────
 
+    @Transactional
     public EliminationBracketDto getBracket(Long tournamentId) {
         tournamentRepository.findById(tournamentId)
                 .orElseThrow(() -> new ResourceNotFoundException("Torneo", tournamentId));
@@ -166,8 +167,12 @@ public class EliminationService {
                 .findByTournamentIdAndPhase(tournamentId, MatchPhase.ELIMINATION);
 
         if (matches.isEmpty()) {
-            // Todavía no se generó el bracket real (faltan resultados de zona).
-            // Devolvemos una VISTA PREVIA estructural con los cruces tentativos por posición.
+            // Si TODAS las zonas ya están jugadas, armamos el bracket real automáticamente
+            // (con los nombres de las parejas clasificadas y la opción de cargar resultados).
+            if (allZonesComplete(tournamentId)) {
+                return generateBracket(tournamentId);
+            }
+            // Si todavía faltan resultados de zona, devolvemos la VISTA PREVIA estructural.
             return getBracketPreview(tournamentId);
         }
 
@@ -317,6 +322,18 @@ public class EliminationService {
             default -> info.zonePosition() + "º";
         };
         return ord + " Zona " + info.zoneName();
+    }
+
+    /** true si el torneo tiene zonas y TODOS sus partidos de zona están jugados (PLAYED). */
+    private boolean allZonesComplete(Long tournamentId) {
+        List<Zone> zones = zoneRepository.findByTournamentIdOrderByZoneOrder(tournamentId);
+        if (zones.isEmpty()) return false;
+        for (Zone z : zones) {
+            List<Match> zoneMatches = matchRepository.findByZoneId(z.getId());
+            if (zoneMatches.isEmpty()) return false;
+            if (zoneMatches.stream().anyMatch(m -> m.getStatus() != MatchStatus.PLAYED)) return false;
+        }
+        return true;
     }
 
     // ── Clasificados por zona ─────────────────────────────────────────────────
