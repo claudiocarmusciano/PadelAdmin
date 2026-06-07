@@ -203,6 +203,7 @@ public class EliminationService {
                 .totalClassified((int) totalClassified)
                 .bracketSize(bracketSize)
                 .preview(false)
+                .stale(isBracketStale(tournamentId, matches, bracketSize))
                 .rounds(orderedRounds)
                 .build();
     }
@@ -341,6 +342,52 @@ public class EliminationService {
         }
         matchRepository.deleteAll(elim);
         log.info("Bracket del torneo {} invalidado por cambio en resultados de zona (se regenerará al verlo)", tournamentId);
+    }
+
+    /**
+     * Detecta si un bracket real ya generado quedó desactualizado respecto a la clasificación
+     * ACTUAL de las zonas (ej: se corrigió un resultado de zona después de generar el cuadro).
+     * Recalcula el sembrado de primera ronda como lo haría una regeneración y lo compara con
+     * lo persistido; si algún cruce difiere, el bracket está desactualizado.
+     */
+    private boolean isBracketStale(Long tournamentId, List<Match> existing, int bracketSize) {
+        List<ClassifiedPairInfo> classified;
+        try {
+            classified = getClassifiedPairs(tournamentId);
+        } catch (BusinessException e) {
+            return false; // zonas incompletas en este instante → no marcamos nada
+        }
+        int n = classified.size();
+        if (nextPowerOf2(n) != bracketSize) return true; // cambió la cantidad de clasificados
+
+        int totalPairs = (int) pairRepository.countByTournamentId(tournamentId);
+        List<Integer> seedOrder = generateSeedOrder(n, bracketSize, totalPairs);
+        List<ClassifiedPairInfo> seedMap = new ArrayList<>(classified);
+        for (int i = 0; i < bracketSize - n; i++) seedMap.add(null);
+        resolveZoneConflicts(seedOrder, seedMap);
+
+        int firstElim = bracketSize / 2;
+        // Cruces persistidos en primera ronda: slot -> set de pairIds
+        Map<Integer, Set<Long>> actual = new HashMap<>();
+        for (Match m : existing) {
+            if (m.getEliminationRound() != null && m.getEliminationRound() == firstElim) {
+                Set<Long> ids = new HashSet<>();
+                if (m.getPair1() != null) ids.add(m.getPair1().getId());
+                if (m.getPair2() != null) ids.add(m.getPair2().getId());
+                actual.put(m.getBracketSlot(), ids);
+            }
+        }
+        // Cruces esperados según la clasificación actual
+        for (int i = 0; i < seedOrder.size(); i += 2) {
+            int slot = i / 2 + 1;
+            ClassifiedPairInfo a = seedMap.get(seedOrder.get(i) - 1);
+            ClassifiedPairInfo b = seedMap.get(seedOrder.get(i + 1) - 1);
+            Set<Long> expected = new HashSet<>();
+            if (a != null) expected.add(a.pairId());
+            if (b != null) expected.add(b.pairId());
+            if (!expected.equals(actual.getOrDefault(slot, Set.of()))) return true;
+        }
+        return false;
     }
 
     /** true si el torneo tiene zonas y TODOS sus partidos de zona están jugados (PLAYED). */

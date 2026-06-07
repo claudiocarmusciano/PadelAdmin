@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { Trophy } from 'lucide-react'
+import { Trophy, AlertTriangle } from 'lucide-react'
 import { generateElimination, getElimination } from '@/api/tournaments'
 import { apiErrorMessage } from '@/lib/axios'
 import { useAuth } from '@/contexts/AuthContext'
@@ -276,6 +276,36 @@ export default function BracketTab({ tournamentId }: Props) {
               Los cruces se muestran por posición (ej: <em>1º Zona A vs 2º Zona D</em>) según el sorteo oficial.
               Se confirman con las parejas reales cuando cargues todos los resultados de zona y generes el bracket.
             </p>
+          </div>
+        </div>
+      )}
+
+      {bracket && !bracket.preview && bracket.stale && (
+        <div className="flex items-start gap-2 p-3 rounded-md bg-destructive/10 border border-destructive/40 text-sm">
+          <AlertTriangle size={15} className="text-destructive shrink-0 mt-0.5" />
+          <div className="flex-1 min-w-0">
+            <p className="font-semibold text-destructive">El bracket quedó desactualizado</p>
+            <p className="text-xs mt-0.5 text-destructive/90">
+              La clasificación de las zonas cambió (por ejemplo, corregiste un resultado) y el cuadro
+              ya no coincide. Regeneralo para reflejar las parejas correctas.
+              <strong> Ojo:</strong> regenerar borra los resultados ya cargados en el cuadro.
+            </p>
+            {isAdmin && (
+              <Button
+                size="sm"
+                variant="destructive"
+                className="mt-2 h-7 text-xs"
+                onClick={() => {
+                  if (confirm('Regenerar el bracket con la clasificación corregida. Se borrarán los resultados ya cargados en el cuadro. ¿Continuar?')) {
+                    generateMut.mutate()
+                  }
+                }}
+                disabled={generateMut.isPending}
+              >
+                <Trophy size={13} className="mr-1.5" />
+                Regenerar bracket ahora
+              </Button>
+            )}
           </div>
         </div>
       )}

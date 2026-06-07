@@ -347,6 +347,7 @@ export interface EliminationBracket {
   totalClassified: number
   bracketSize: number
   preview?: boolean
+  stale?: boolean  // el bracket quedó desactualizado vs la clasificación actual de zonas
   rounds: Record<string, EliminationMatch[]>
 }
 
