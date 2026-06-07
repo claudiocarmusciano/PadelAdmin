@@ -43,8 +43,14 @@ public class EliminationService {
         int n = classified.size();
         if (n < 2) throw new BusinessException("Se necesitan al menos 2 parejas clasificadas");
 
-        // 2. Eliminar bracket existente
+        // 2. Eliminar bracket existente.
+        //    Primero los resultados de esos partidos (la FK match_result→match lo exige; los sets
+        //    se borran por cascade), si no, deleteAll falla con error de integridad.
         List<Match> existing = matchRepository.findByTournamentIdAndPhase(tournamentId, MatchPhase.ELIMINATION);
+        for (Match m : existing) {
+            matchResultRepository.findByMatchId(m.getId()).ifPresent(matchResultRepository::delete);
+        }
+        matchResultRepository.flush();
         matchRepository.deleteAll(existing);
 
         // 3. Tamaño del bracket: nextPowerOf2 del número de CLASIFICADOS.
