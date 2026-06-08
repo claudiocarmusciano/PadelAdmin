@@ -89,13 +89,13 @@ function BracketMatch({
       onClick={() => canLoadResult && onResult(match)}
       title={canLoadResult ? 'Click para cargar resultado' : undefined}
     >
-      <div className="flex items-center gap-1.5 mb-1.5">
+      <div className="flex items-center gap-1.5 mb-1.5 flex-wrap">
         <Badge variant="outline" className="text-xs">{match.roundName}</Badge>
         {isBye && (
           <span className="text-xs font-medium text-muted-foreground bg-muted px-1.5 py-0.5 rounded">BYE</span>
         )}
         {match.status === 'PLAYED' && (
-          <span className="text-xs text-primary ml-auto flex items-center gap-1.5">
+          <span className="text-xs text-primary ml-auto flex items-center gap-1.5 whitespace-nowrap shrink-0">
             ✓ Jugado
             {canEdit && (
               <button
