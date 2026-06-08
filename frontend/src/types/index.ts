@@ -385,3 +385,52 @@ export interface GlobalSettings {
   defaultMatchDurationMinutes: number
   defaultMinIntervalMinutes: number
 }
+
+// ── Reservas de Canchas ────────────────────────────────────────────
+
+export interface ComplexDto {
+  id: number
+  name: string
+  address: string
+  phone: string
+  courts: CourtDto[]
+}
+
+export interface CourtDto {
+  id: number
+  name: string
+  active: boolean
+  slotDurationMinutes: number
+}
+
+export interface AvailableSlotDto {
+  startTime: string  // HH:mm
+  endTime: string    // HH:mm
+  available: boolean
+  reason?: string    // null si available=true; ej "Ocupado por reserva"
+}
+
+export interface CourtBookingRequestDto {
+  courtId: number
+  bookingDate: string  // YYYY-MM-DD
+  startTime: string    // HH:mm
+  customerName: string
+  customerPhone: string
+  notes?: string
+}
+
+export interface CourtBookingResponseDto {
+  id: number
+  courtId: number
+  courtName: string
+  complexName: string
+  bookingDate: string
+  startTime: string
+  endTime: string
+  status: 'CONFIRMED' | 'CANCELLED'
+  source: 'PUBLIC' | 'ADMIN'
+  customerName: string
+  customerPhone: string
+  notes?: string
+  createdAt: string
+}
