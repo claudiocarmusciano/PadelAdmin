@@ -405,9 +405,9 @@ export default function BracketTab({ tournamentId, complexId, startDate, endDate
     mutationFn: () => generateElimination(tournamentId),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['bracket', tournamentId] })
-      toast.success('Bracket generado')
+      toast.success('Llaves generadas')
     },
-    onError: (error) => toast.error(apiErrorMessage(error, 'Error al generar el bracket')),
+    onError: (error) => toast.error(apiErrorMessage(error, 'Error al generar las llaves')),
   })
 
   // Ordenar de mayor eliminationRound (primera ronda) a menor (final)
@@ -446,14 +446,14 @@ export default function BracketTab({ tournamentId, complexId, startDate, endDate
         {isAdmin && (
           <Button onClick={() => generateMut.mutate()} disabled={generateMut.isPending}>
             <Trophy size={15} className="mr-1.5" />
-            {bracket ? 'Regenerar bracket' : 'Generar bracket'}
+            {bracket ? 'Regenerar llaves' : 'Generar llaves'}
           </Button>
         )}
         {bracket && (
           <span className="text-sm text-muted-foreground">
             {bracket.preview
               ? `${bracket.totalClassified} clasificarán · cuadro de ${bracket.bracketSize}`
-              : `${bracket.totalClassified} clasificados · bracket de ${bracket.bracketSize}`}
+              : `${bracket.totalClassified} clasificados · llaves de ${bracket.bracketSize}`}
           </span>
         )}
       </div>
@@ -475,7 +475,7 @@ export default function BracketTab({ tournamentId, complexId, startDate, endDate
         <div className="flex items-start gap-2 p-3 rounded-md bg-destructive/10 border border-destructive/40 text-sm">
           <AlertTriangle size={15} className="text-destructive shrink-0 mt-0.5" />
           <div className="flex-1 min-w-0">
-            <p className="font-semibold text-destructive">El bracket quedó desactualizado</p>
+            <p className="font-semibold text-destructive">Las llaves quedaron desactualizadas</p>
             <p className="text-xs mt-0.5 text-destructive/90">
               La clasificación de las zonas cambió (por ejemplo, corregiste un resultado) y el cuadro
               ya no coincide. Regeneralo para reflejar las parejas correctas.
@@ -487,14 +487,14 @@ export default function BracketTab({ tournamentId, complexId, startDate, endDate
                 variant="destructive"
                 className="mt-2 h-7 text-xs"
                 onClick={() => {
-                  if (confirm('Regenerar el bracket con la clasificación corregida. Se borrarán los resultados ya cargados en el cuadro. ¿Continuar?')) {
+                  if (confirm('Regenerar las llaves con la clasificación corregida. Se borrarán los resultados ya cargados en las llaves. ¿Continuar?')) {
                     generateMut.mutate()
                   }
                 }}
                 disabled={generateMut.isPending}
               >
                 <Trophy size={13} className="mr-1.5" />
-                Regenerar bracket ahora
+                Regenerar llaves ahora
               </Button>
             )}
           </div>

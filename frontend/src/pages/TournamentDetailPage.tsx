@@ -28,9 +28,9 @@ const statusLabels: Record<string, string> = {
 const tabs = [
   { path: 'pairs', label: 'Parejas' },
   { path: 'zones', label: 'Zonas' },
-  { path: 'fixture', label: 'Fixture' },
+  { path: 'fixture', label: 'Fixture/Resultados' },
   { path: 'calendar', label: 'Calendario' },
-  { path: 'bracket', label: 'Bracket' },
+  { path: 'bracket', label: 'Llaves' },
 ]
 
 export default function TournamentDetailPage() {

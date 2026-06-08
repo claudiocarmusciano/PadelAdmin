@@ -468,7 +468,7 @@ export default function TournamentsPage() {
                   </li>
                   <li className="flex items-start gap-1.5">
                     <span className="text-destructive">•</span>
-                    <span>Todos los <strong>partidos</strong> (de zona y bracket)</span>
+                    <span>Todos los <strong>partidos</strong> (de zona y llaves)</span>
                   </li>
                   <li className="flex items-start gap-1.5">
                     <span className="text-destructive">•</span>
