@@ -36,6 +36,9 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         // Endpoints públicos de autenticación
                         .requestMatchers("/api/auth/login", "/api/auth/register", "/api/auth/guest").permitAll()
+                        // Endpoints públicos de reservas (sin autenticación)
+                        .requestMatchers(HttpMethod.GET, "/api/public/**").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/public/bookings").permitAll()
                         // Lectura: cualquier usuario autenticado
                         .requestMatchers(HttpMethod.GET, "/api/**").authenticated()
                         // Escritura: solo ADMIN
