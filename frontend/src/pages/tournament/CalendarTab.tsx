@@ -242,9 +242,15 @@ function MatchDetailDialog({ match, onClose, onMove, canMove }: {
             <div className="border-t pt-3">
               <div className="text-xs font-semibold mb-1 text-muted-foreground">Resultado</div>
               <div className="text-sm tabular-nums">
-                {match.sets.map((s, i) => (
-                  <span key={i} className="mr-3">{s.pair1Games}-{s.pair2Games}</span>
-                ))}
+                {(() => {
+                  // Los games de la pareja GANADORA van primero
+                  const pair2Won = !!match.pair2 && match.winnerPairId === match.pair2.id
+                  return match.sets!.map((s, i) => (
+                    <span key={i} className="mr-3">
+                      {pair2Won ? `${s.pair2Games}-${s.pair1Games}` : `${s.pair1Games}-${s.pair2Games}`}
+                    </span>
+                  ))
+                })()}
               </div>
             </div>
           )}

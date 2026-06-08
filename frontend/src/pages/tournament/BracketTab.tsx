@@ -160,16 +160,19 @@ function BracketMatch({
         )
       })()}
 
-      {/* Marcador */}
-      {match.status === 'PLAYED' && match.sets && match.sets.length > 0 && (
-        <div className="mt-1.5 flex gap-1.5">
-          {match.sets.map((s, i) => (
-            <span key={i} className="text-xs tabular-nums text-muted-foreground">
-              {s.pair1Games}-{s.pair2Games}
-            </span>
-          ))}
-        </div>
-      )}
+      {/* Marcador — los games de la pareja GANADORA van primero */}
+      {match.status === 'PLAYED' && match.sets && match.sets.length > 0 && (() => {
+        const pair2Won = !!match.pair2 && match.winnerPairId === match.pair2.id
+        return (
+          <div className="mt-1.5 flex gap-1.5">
+            {match.sets.map((s, i) => (
+              <span key={i} className="text-xs tabular-nums text-muted-foreground">
+                {pair2Won ? `${s.pair2Games}-${s.pair1Games}` : `${s.pair1Games}-${s.pair2Games}`}
+              </span>
+            ))}
+          </div>
+        )
+      })()}
 
       {match.scheduledStart ? (
         <div className="mt-1.5 flex items-center justify-between gap-1.5">
