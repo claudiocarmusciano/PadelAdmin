@@ -28,7 +28,15 @@ public class Court {
     @Builder.Default
     private boolean active = true;
 
+    @Column(name = "slot_duration_minutes", nullable = true)
+    @Builder.Default
+    private Integer slotDurationMinutes = 90;
+
     @OneToMany(mappedBy = "court", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
     private List<CourtAvailability> availabilities = new ArrayList<>();
+
+    @OneToMany(mappedBy = "court", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
+    private List<CourtBooking> bookings = new ArrayList<>();
 }
