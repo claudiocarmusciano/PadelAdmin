@@ -13,7 +13,7 @@
 | 2 | Cada club gestiona sus propias categorías / puntos / ranking. |
 | 3 | **Club = complejo** (un club tiene varias canchas). |
 | 4 | Sistema de cuentas nuevo + **email real vía Gmail (SMTP)**. |
-| 5 | **DNI** como clave única del jugador → **obligatorio a futuro** (hoy opcional). |
+| 5 | **DNI = clave única OBLIGATORIA** del jugador (evita duplicados, habilita el perfil compartido). **Email obligatorio**, con función de **activar/cambiar la primera contraseña** y **recuperarla**. Login del jugador = **DNI + contraseña**. |
 | 6 | Se mantiene **vista pública sin login** (espectador). |
 
 **Consecuencia clave del #1:** lo único global es el **Player** (identidad). **Todo lo demás es por club**: categorías, puntos, torneos, parejas, partidos, zonas, canchas, turnos, horarios.
@@ -34,7 +34,7 @@
 ## 2. Modelo de datos: qué es global vs club-scoped
 
 ### 2.1 GLOBAL (compartido entre todos los clubes)
-- **`Player`** — la identidad del jugador. Campos: `id, firstName, lastName, dni (único cuando presente, futuro obligatorio), email, phone, createdAt`. **No tiene `club_id`.**
+- **`Player`** — la identidad del jugador. Campos: `id, firstName, lastName, dni (ÚNICO, obligatorio en altas nuevas), email (obligatorio en altas nuevas), phone, accountActivated (bool), createdAt`. **No tiene `club_id`.** *(Los jugadores legacy sin DNI/email quedan como excepción — ver §5.)*
 - **`User`** — cuentas de acceso (ver §4). También global; se asocia a un club (rol CLUB) o a un player (rol PLAYER).
 
 ### 2.2 POR CLUB (club-scoped — llevan `club_id` directa o indirectamente)
@@ -87,11 +87,17 @@
 4. En el **primer login**, `mustChangePassword=true` → la app **obliga a cambiarla** antes de seguir.
 
 ### 4.3 Cuentas de jugador
-- **Email obligatorio**, DNI opcional (futuro obligatorio/único).
-- **Auto-registro:** el jugador se registra con email → recibe **link/clave por email** para activar y setear su contraseña.
-- **Alta por el club:** el club lo crea con email → el jugador recibe el email para activar su cuenta.
-- **"Olvidé mi clave":** email con link de reset.
-- **Dedup por DNI:** cuando el DNI sea obligatorio, será la clave única que evita duplicados entre clubes (hoy hay duplicados porque no hay DNI).
+**Clave única = DNI.** **Email = obligatorio** (canal de activación y recuperación). **Login del jugador = DNI + contraseña.**
+
+Dos estados del jugador:
+- **Con cuenta activada** → tiene DNI + email + **contraseña seteada por él**; puede **loguearse** y ver su perfil (sus torneos/turnos/ranking en cada club). Es la identidad compartida "de verdad".
+- **Sin activar** → existe con DNI + email (lo creó un club o se está registrando) pero **todavía no seteó su contraseña**; aún no puede entrar hasta activarla por email.
+
+Flujos:
+- **Auto-registro:** el jugador se registra con **DNI + email** → recibe un **link por email** para **setear su contraseña** y activar.
+- **Alta por el club:** el club lo crea con **DNI + email** → el jugador recibe el email para **activar y poner su contraseña** la primera vez.
+- **"Olvidé mi contraseña":** email con link de reset.
+- **Dedup por DNI:** el DNI (único) garantiza que "Juan Pérez del Club A" y "del Club B" sean **el mismo registro**. Si un club intenta crear un DNI ya existente → se **vincula** al jugador existente del padrón (no se duplica).
 
 ### 4.4 Infraestructura de email (Gmail SMTP)
 - `spring-boot-starter-mail` + **Gmail SMTP** (`smtp.gmail.com:587`, STARTTLS, **App Password** de la cuenta de Gmail — no la contraseña normal).
@@ -109,7 +115,7 @@ Los datos de hoy (un solo club) se asignan a un club nuevo, **sin perder nada**:
 2. Asignar a Club #1: las **canchas** actuales, las **categorías** actuales (pasan a ser de Club #1), todos los **torneos** actuales, `PointConfig`, buffers.
 3. Los **jugadores** quedan en el **padrón global** (se desacoplan del club). Sus `PlayerCategoryPoints` siguen apuntando a las categorías (ahora de Club #1) → sus puntos pasan a ser de Club #1.
 4. Usuarios: `admin@padel.com` se convierte en **SUPER_ADMIN** (vos). Se crea un `User(role=CLUB)` para Club #1 (quien lo opere).
-5. **DNI/email de jugadores:** quedan **null** (no se exige retroactivo); se completan con el tiempo.
+5. **Jugadores legacy (los ~432 actuales) sin DNI/email:** quedan como **excepción grandfathered** — siguen existiendo y jugando en Club #1, pero **no pueden loguearse** hasta que se les complete **DNI + email** y activen su cuenta. Las altas **nuevas** sí exigen DNI + email. Cuando un jugador legacy se registra con su DNI real, se **vincula** a su registro existente (no se duplica).
 
 > La migración se hace con un script idempotente (o un `SchemaPatcher`), probado primero en una copia. **No** a mano sobre producción.
 
