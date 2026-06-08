@@ -1,7 +1,7 @@
-import { Routes, Route, NavLink, useParams, Navigate } from 'react-router-dom'
+import { Routes, Route, NavLink, useParams, Navigate, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { CheckCircle } from 'lucide-react'
+import { CheckCircle, ArrowLeft } from 'lucide-react'
 import { getTournament, updateTournamentStatus } from '@/api/tournaments'
 import { apiErrorMessage } from '@/lib/axios'
 import { useAuth } from '@/contexts/AuthContext'
@@ -38,6 +38,7 @@ export default function TournamentDetailPage() {
   const tournamentId = Number(id)
   const qc = useQueryClient()
   const { isAdmin } = useAuth()
+  const navigate = useNavigate()
 
   const { data: tournament, isLoading } = useQuery({
     queryKey: ['tournament', tournamentId],
@@ -72,6 +73,17 @@ export default function TournamentDetailPage() {
 
   return (
     <div className="space-y-6">
+      {/* Volver a Torneos */}
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={() => navigate('/tournaments')}
+        className="-ml-2 h-8 text-muted-foreground hover:text-foreground"
+      >
+        <ArrowLeft size={16} className="mr-1.5" />
+        Volver a Torneos
+      </Button>
+
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4 md:gap-0">
         <div className="min-w-0">
