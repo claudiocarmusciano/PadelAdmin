@@ -6,6 +6,8 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -40,4 +42,23 @@ public interface MatchRepository extends JpaRepository<Match, Long> {
             WHERE m.pair1.id IN :pairIds OR m.pair2.id IN :pairIds
             """)
     List<Match> findByPairIdIn(@Param("pairIds") List<Long> pairIds);
+
+    /**
+     * Buscar partidos en una cancha dentro de un rango de fecha/hora.
+     * Se usa para detectar conflictos de turnos con partidos de torneo.
+     */
+    @Query("""
+            SELECT m FROM Match m
+            WHERE m.court.id = :courtId
+            AND CAST(m.scheduledStart AS date) = :bookingDate
+            AND m.status IN ('SCHEDULED', 'CONFIRMED', 'PLAYED')
+            AND m.scheduledStart < :endTime
+            AND m.scheduledEnd > :startTime
+            """)
+    List<Match> findConflictingMatches(
+            @Param("courtId") Long courtId,
+            @Param("bookingDate") LocalDate bookingDate,
+            @Param("startTime") LocalDateTime startTime,
+            @Param("endTime") LocalDateTime endTime
+    );
 }
