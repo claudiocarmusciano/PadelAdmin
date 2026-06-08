@@ -126,7 +126,7 @@ export default function TournamentDetailPage() {
         <Route path="zones" element={<ZonesTab tournamentId={tournamentId} />} />
         <Route path="fixture" element={<FixtureTab tournamentId={tournamentId} startDate={tournament.startDate} endDate={tournament.endDate} zoneDays={tournament.zoneDays ?? []} />} />
         <Route path="calendar" element={<CalendarTab tournamentId={tournamentId} />} />
-        <Route path="bracket" element={<BracketTab tournamentId={tournamentId} />} />
+        <Route path="bracket" element={<BracketTab tournamentId={tournamentId} complexId={tournament.complexId} startDate={tournament.startDate} endDate={tournament.endDate} />} />
       </Routes>
     </div>
   )
