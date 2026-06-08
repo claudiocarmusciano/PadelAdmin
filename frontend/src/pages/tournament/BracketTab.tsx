@@ -51,8 +51,8 @@ function datesInRange(startDate: string, endDate: string): string[] {
 
 const statusColors: Record<string, string> = {
   PENDING:   'bg-muted text-muted-foreground',
-  SCHEDULED: 'bg-blue-50 text-blue-700',
-  CONFIRMED: 'bg-green-50 text-green-700',
+  SCHEDULED: 'bg-sky-500/15 text-sky-200',
+  CONFIRMED: 'bg-indigo-500/15 text-indigo-200',
   PLAYED:    'bg-primary/10 text-primary',
   CANCELLED: 'bg-destructive/10 text-destructive',
 }
