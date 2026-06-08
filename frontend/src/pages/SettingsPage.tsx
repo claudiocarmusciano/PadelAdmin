@@ -1,14 +1,13 @@
 import { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { Settings, Save, Trophy, Clock, RotateCcw, AlertTriangle } from 'lucide-react'
+import { Settings, Save, Trophy, RotateCcw, AlertTriangle } from 'lucide-react'
 import {
   getPointConfigs, updatePointConfigs,
-  getGlobalSettings, updateGlobalSettings,
   resetPlayerPoints,
 } from '@/api/settings'
 import { STAGE_LABELS } from '@/types'
-import type { PointConfig, GlobalSettings } from '@/types'
+import type { PointConfig } from '@/types'
 import { useAuth } from '@/contexts/AuthContext'
 import { apiErrorMessage } from '@/lib/axios'
 import { Button } from '@/components/ui/button'
@@ -91,105 +90,6 @@ function PointsCard() {
               >
                 <Save size={14} className="mr-1.5" />
                 Guardar puntos
-              </Button>
-            </div>
-          </div>
-        )}
-      </CardContent>
-    </Card>
-  )
-}
-
-// ── Configuración general ─────────────────────────────────────────────────────
-
-function GeneralCard() {
-  const qc = useQueryClient()
-  const { data: settings, isLoading } = useQuery({
-    queryKey: ['settings', 'general'],
-    queryFn: getGlobalSettings,
-  })
-
-  const [draft, setDraft] = useState<GlobalSettings>({
-    defaultMatchDurationMinutes: 90,
-    defaultMinIntervalMinutes: 60,
-  })
-
-  useEffect(() => {
-    if (settings) setDraft(settings)
-  }, [settings])
-
-  const saveMut = useMutation({
-    mutationFn: () => updateGlobalSettings(draft),
-    onSuccess: (data) => {
-      qc.setQueryData(['settings', 'general'], data)
-      toast.success('Configuración guardada')
-    },
-    onError: () => toast.error('Error al guardar la configuración'),
-  })
-
-  const isDirty = JSON.stringify(draft) !== JSON.stringify(settings)
-
-  const setField = (field: keyof GlobalSettings, value: string) => {
-    const n = parseInt(value, 10)
-    setDraft((prev) => ({ ...prev, [field]: isNaN(n) ? 0 : Math.max(0, n) }))
-  }
-
-  return (
-    <Card>
-      <CardHeader>
-        <div className="flex items-center gap-2">
-          <Clock size={18} className="text-primary" />
-          <CardTitle className="text-base">Parámetros de fixture</CardTitle>
-        </div>
-        <CardDescription className="text-xs">
-          Valores por defecto al crear nuevos torneos. No afectan torneos ya generados.
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        {isLoading ? (
-          <p className="text-sm text-muted-foreground">Cargando...</p>
-        ) : (
-          <div className="space-y-4">
-            <div className="flex flex-col md:flex-row md:items-center gap-2 md:gap-3">
-              <Label className="md:w-60 md:shrink-0 text-sm text-muted-foreground">
-                Duración por defecto de partidos
-              </Label>
-              <div className="flex items-center gap-2">
-                <Input
-                  type="number"
-                  min={1}
-                  value={draft.defaultMatchDurationMinutes}
-                  onChange={(e) => setField('defaultMatchDurationMinutes', e.target.value)}
-                  className="w-24 h-8 text-sm"
-                />
-                <span className="text-xs text-muted-foreground">min</span>
-              </div>
-            </div>
-
-            <div className="flex flex-col md:flex-row md:items-center gap-2 md:gap-3">
-              <Label className="md:w-60 md:shrink-0 text-sm text-muted-foreground">
-                Pausa mínima entre partidos de la misma pareja (zona)
-              </Label>
-              <div className="flex items-center gap-2">
-                <Input
-                  type="number"
-                  min={0}
-                  value={draft.defaultMinIntervalMinutes}
-                  onChange={(e) => setField('defaultMinIntervalMinutes', e.target.value)}
-                  className="w-24 h-8 text-sm"
-                />
-                <span className="text-xs text-muted-foreground">min</span>
-              </div>
-            </div>
-
-            <div className="pt-1 flex justify-end">
-              <Button
-                size="sm"
-                disabled={!isDirty || saveMut.isPending}
-                onClick={() => saveMut.mutate()}
-              >
-                <Save size={14} className="mr-1.5" />
-                Guardar configuración
               </Button>
             </div>
           </div>
@@ -287,9 +187,8 @@ export default function SettingsPage() {
         <h1 className="text-xl font-semibold">Configuración</h1>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="max-w-2xl">
         <PointsCard />
-        <GeneralCard />
       </div>
 
       {isAdmin && <SeasonResetCard />}
