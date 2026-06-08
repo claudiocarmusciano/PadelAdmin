@@ -1,14 +1,19 @@
 import { useMemo, useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
-import { Calendar, Trophy, Clock } from 'lucide-react'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { toast } from 'sonner'
+import { Calendar, Trophy, Clock, Move } from 'lucide-react'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 
 import { getFixture } from '@/api/tournaments'
+import { getMatchPlacements, moveMatch, type MatchPlacement } from '@/api/matches'
+import { apiErrorMessage } from '@/lib/axios'
+import { useAuth } from '@/contexts/AuthContext'
 import type { MatchResponse, MatchPair } from '@/types'
+import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { cn } from '@/lib/utils'
 
 interface Props {
@@ -191,10 +196,17 @@ function MatchBlock({
 }
 
 // ── Detalle de partido (modal) ──────────────────────────────────────────────
-function MatchDetailDialog({ match, onClose }: { match: MatchResponse | null; onClose: () => void }) {
+function MatchDetailDialog({ match, onClose, onMove, canMove }: {
+  match: MatchResponse | null
+  onClose: () => void
+  onMove: (m: MatchResponse) => void
+  canMove: boolean
+}) {
   if (!match) return null
   const p1Names = pairFullLabel(match.pair1)
   const p2Names = pairFullLabel(match.pair2)
+  // Se puede mover si es admin, tiene parejas reales y todavía no se jugó
+  const movable = canMove && !!match.pair1 && !!match.pair2 && match.status !== 'PLAYED'
 
   return (
     <Dialog open={true} onOpenChange={(o) => !o && onClose()}>
@@ -237,6 +249,112 @@ function MatchDetailDialog({ match, onClose }: { match: MatchResponse | null; on
             </div>
           )}
         </div>
+        {movable && (
+          <DialogFooter>
+            <Button onClick={() => onMove(match)}>
+              <Move size={14} className="mr-1.5" />
+              Mover partido
+            </Button>
+          </DialogFooter>
+        )}
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+// ── Dialog para mover un partido (slots verde/rojo) ──────────────────────────
+function MoveMatchDialog({ match, tournamentId, onClose }: {
+  match: MatchResponse
+  tournamentId: number
+  onClose: () => void
+}) {
+  const qc = useQueryClient()
+  const { data: placements = [], isLoading } = useQuery({
+    queryKey: ['placements', match.id],
+    queryFn: () => getMatchPlacements(match.id),
+  })
+
+  const moveMut = useMutation({
+    mutationFn: (p: MatchPlacement) => moveMatch(match.id, p.courtId, `${p.date}T${p.startTime}:00`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['fixture', tournamentId] })
+      toast.success('Partido movido')
+      onClose()
+    },
+    onError: (e) => toast.error(apiErrorMessage(e, 'No se pudo mover el partido')),
+  })
+
+  // Agrupar por fecha → por cancha (preservando el orden que viene del backend)
+  const byDate = new Map<string, Map<string, { courtId: number; slots: MatchPlacement[] }>>()
+  for (const p of placements) {
+    if (!byDate.has(p.date)) byDate.set(p.date, new Map())
+    const courts = byDate.get(p.date)!
+    if (!courts.has(p.courtName)) courts.set(p.courtName, { courtId: p.courtId, slots: [] })
+    courts.get(p.courtName)!.slots.push(p)
+  }
+
+  return (
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-2xl sm:max-w-2xl max-h-[85vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2 text-base">
+            <Move size={16} className="text-primary" />
+            Mover partido
+          </DialogTitle>
+        </DialogHeader>
+        <div className="text-sm space-y-1 mb-1">
+          <div className="font-medium">{pairFullLabel(match.pair1)} <span className="text-muted-foreground">vs</span> {pairFullLabel(match.pair2)}</div>
+          <p className="text-xs text-muted-foreground">
+            Tocá un horario en <span className="text-emerald-400 font-medium">verde</span> (disponible).
+            Los <span className="text-destructive font-medium">rojos</span> no se pueden: chocan con otro partido o violan una restricción/pulmón.
+          </p>
+        </div>
+        {isLoading ? (
+          <p className="text-sm text-muted-foreground py-6 text-center">Cargando horarios…</p>
+        ) : placements.length === 0 ? (
+          <p className="text-sm text-muted-foreground py-6 text-center">No hay horarios disponibles (revisá los horarios de las canchas).</p>
+        ) : (
+          <div className="space-y-4">
+            {[...byDate.entries()].map(([date, courts]) => (
+              <div key={date}>
+                <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">
+                  {format(new Date(date + 'T00:00:00'), "EEEE d 'de' MMMM", { locale: es })}
+                </div>
+                <div className="space-y-2">
+                  {[...courts.entries()].map(([courtName, { slots }]) => (
+                    <div key={courtName} className="flex gap-2 items-start">
+                      <div className="w-20 shrink-0 text-xs font-medium pt-1.5">{courtName}</div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {slots.map((p) => (
+                          <button
+                            key={`${p.courtId}-${p.startTime}`}
+                            type="button"
+                            disabled={!p.valid || p.current || moveMut.isPending}
+                            onClick={() => moveMut.mutate(p)}
+                            title={p.current ? 'Posición actual' : p.valid ? `Mover acá (${p.startTime})` : (p.reason ?? 'No disponible')}
+                            className={cn(
+                              'px-2 py-1 rounded-md text-xs font-medium tabular-nums border transition-colors',
+                              p.current
+                                ? 'border-primary text-primary bg-primary/10 cursor-default'
+                                : p.valid
+                                  ? 'border-emerald-500/40 text-emerald-300 bg-emerald-500/10 hover:bg-emerald-500/25 cursor-pointer'
+                                  : 'border-destructive/30 text-destructive/50 bg-destructive/5 cursor-not-allowed line-through'
+                            )}
+                          >
+                            {p.startTime}{p.current ? ' • acá' : ''}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>Cerrar</Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   )
@@ -337,7 +455,9 @@ function DayCalendar({ bucket, onMatchClick }: { bucket: DayBucket; onMatchClick
 
 // ── Tab principal ───────────────────────────────────────────────────────────
 export default function CalendarTab({ tournamentId }: Props) {
+  const { isAdmin } = useAuth()
   const [selected, setSelected] = useState<MatchResponse | null>(null)
+  const [moving, setMoving] = useState<MatchResponse | null>(null)
 
   const { data: fixture, isLoading } = useQuery({
     queryKey: ['fixture', tournamentId],
@@ -448,7 +568,15 @@ export default function CalendarTab({ tournamentId }: Props) {
         </Card>
       )}
 
-      <MatchDetailDialog match={selected} onClose={() => setSelected(null)} />
+      <MatchDetailDialog
+        match={selected}
+        onClose={() => setSelected(null)}
+        canMove={isAdmin}
+        onMove={(m) => { setSelected(null); setMoving(m) }}
+      />
+      {moving && (
+        <MoveMatchDialog match={moving} tournamentId={tournamentId} onClose={() => setMoving(null)} />
+      )}
     </div>
   )
 }

@@ -31,6 +31,33 @@ export const updateMatchCourt = async (
   return data
 }
 
+export interface MatchPlacement {
+  courtId: number
+  courtName: string
+  date: string       // "YYYY-MM-DD"
+  startTime: string  // "HH:mm"
+  endTime: string    // "HH:mm"
+  valid: boolean     // true = se puede mover acá (verde)
+  current: boolean   // true = posición actual del partido
+  reason?: string | null  // motivo si es inválido
+}
+
+/** Destinos posibles (cancha+fecha+hora) para mover un partido, con validez verde/rojo. */
+export const getMatchPlacements = async (matchId: number): Promise<MatchPlacement[]> => {
+  const { data } = await api.get(`/matches/${matchId}/placements`)
+  return data
+}
+
+/** Mueve un partido a (cancha, horario). El backend valida y rechaza si es inválido. */
+export const moveMatch = async (
+  matchId: number,
+  courtId: number,
+  scheduledStart: string   // ISO datetime "YYYY-MM-DDTHH:mm:ss"
+): Promise<MatchResponse> => {
+  const { data } = await api.patch(`/matches/${matchId}/move`, { courtId, scheduledStart })
+  return data
+}
+
 export const getZoneStandings = async (zoneId: number): Promise<ZoneStanding[]> => {
   const { data } = await api.get(`/zones/${zoneId}/standings`)
   return data

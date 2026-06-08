@@ -1,5 +1,6 @@
 package com.padeladmin.padeladmin.controller;
 
+import com.padeladmin.padeladmin.dto.fixture.MatchPlacementDto;
 import com.padeladmin.padeladmin.dto.fixture.MatchResponseDto;
 import com.padeladmin.padeladmin.dto.match.MatchResultRequestDto;
 import com.padeladmin.padeladmin.dto.match.MatchResultResponseDto;
@@ -57,6 +58,21 @@ public class MatchResultController {
             @RequestBody CourtUpdateDto dto) {
         return ResponseEntity.ok(
                 fixtureService.updateMatchCourt(matchId, dto.getCourtId(), dto.getScheduledStart()));
+    }
+
+    // Destinos posibles para mover un partido (verde/rojo según validez)
+    @GetMapping("/api/matches/{matchId}/placements")
+    public ResponseEntity<List<MatchPlacementDto>> getPlacements(@PathVariable Long matchId) {
+        return ResponseEntity.ok(fixtureService.getPlacementsForMatch(matchId));
+    }
+
+    // Mover un partido a (cancha, horario) — valida el destino y rechaza si es inválido
+    @PatchMapping("/api/matches/{matchId}/move")
+    public ResponseEntity<MatchResponseDto> move(
+            @PathVariable Long matchId,
+            @RequestBody CourtUpdateDto dto) {
+        return ResponseEntity.ok(
+                fixtureService.moveMatch(matchId, dto.getCourtId(), dto.getScheduledStart()));
     }
 
     @Data

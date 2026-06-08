@@ -2,6 +2,7 @@ package com.padeladmin.padeladmin.service;
 
 import com.padeladmin.padeladmin.dto.fixture.FixtureResponseDto;
 import com.padeladmin.padeladmin.dto.fixture.MatchPairDto;
+import com.padeladmin.padeladmin.dto.fixture.MatchPlacementDto;
 import com.padeladmin.padeladmin.dto.fixture.MatchResponseDto;
 import com.padeladmin.padeladmin.dto.fixture.ReorganizeResultDto;
 import com.padeladmin.padeladmin.entity.*;
@@ -993,6 +994,119 @@ public class FixtureService {
         log.info("Cancha/horario actualizado: Match {} → Court {}, Start {}",
                 matchId, courtId, scheduledStart);
         return toMatchDto(match);
+    }
+
+    // ── Mover partido: destinos válidos + persistencia validada ────────────────
+
+    /**
+     * Devuelve todos los destinos posibles (cancha + fecha + hora) para mover un partido, marcando
+     * cada uno como válido (verde) o inválido (rojo) según las mismas reglas del scheduler
+     * (cancha/pareja libres, intervalo, orden de rondas, horario/pulmón y restricciones horarias).
+     */
+    @Transactional(readOnly = true)
+    public List<MatchPlacementDto> getPlacementsForMatch(Long matchId) {
+        Match match = matchRepository.findById(matchId)
+                .orElseThrow(() -> new ResourceNotFoundException("Partido", matchId));
+        Tournament tournament = match.getTournament();
+        if (tournament.getComplex() == null) {
+            throw new BusinessException("El torneo no tiene un complejo asignado");
+        }
+
+        List<Court> courts = courtRepository.findByComplexIdAndActiveTrue(tournament.getComplex().getId());
+        if (courts.isEmpty()) throw new BusinessException("El complejo no tiene canchas activas");
+        Map<Long, Court> courtMap = courts.stream().collect(Collectors.toMap(Court::getId, c -> c));
+        Map<Long, List<CourtAvailability>> availByCourt = courts.stream().collect(Collectors.toMap(
+                Court::getId, c -> courtAvailabilityRepository.findByCourtIdOrderByDayOfWeek(c.getId())));
+        List<TournamentBuffer> buffers = bufferRepository.findByTournamentIdOrderByDayOfWeek(tournament.getId());
+
+        List<TimeSlot> slots = generateTimeSlots(tournament, courts, availByCourt, buffers);
+        slots.sort(Comparator.comparing(TimeSlot::getDate)
+                .thenComparing(TimeSlot::getStartTime)
+                .thenComparingLong(TimeSlot::getCourtId));
+
+        List<Match> otherScheduled = otherScheduledMatches(tournament.getId(), matchId);
+        Map<Long, List<PairScheduleConstraint>> constraints = buildConstraintsMap(List.of(match));
+
+        LocalDate curDate = match.getScheduledStart() != null ? match.getScheduledStart().toLocalDate() : null;
+        LocalTime curStart = match.getScheduledStart() != null ? match.getScheduledStart().toLocalTime() : null;
+        Long curCourt = match.getCourt() != null ? match.getCourt().getId() : null;
+
+        List<MatchPlacementDto> out = new ArrayList<>();
+        for (TimeSlot slot : slots) {
+            boolean isCurrent = curCourt != null && curCourt.equals(slot.getCourtId())
+                    && slot.getDate().equals(curDate) && slot.getStartTime().equals(curStart);
+            String reason = isCurrent ? null : placementReason(match, slot, otherScheduled, tournament, constraints);
+            out.add(MatchPlacementDto.builder()
+                    .courtId(slot.getCourtId())
+                    .courtName(courtMap.get(slot.getCourtId()).getName())
+                    .date(slot.getDate())
+                    .startTime(slot.getStartTime())
+                    .endTime(slot.getEndTime())
+                    .valid(reason == null)
+                    .current(isCurrent)
+                    .reason(reason)
+                    .build());
+        }
+        return out;
+    }
+
+    /** Mueve un partido a (cancha, horario) validando el destino con las reglas del scheduler. */
+    @Transactional
+    public MatchResponseDto moveMatch(Long matchId, Long courtId, LocalDateTime scheduledStart) {
+        Match match = matchRepository.findById(matchId)
+                .orElseThrow(() -> new ResourceNotFoundException("Partido", matchId));
+        if (courtId == null || scheduledStart == null) {
+            throw new BusinessException("Para mover un partido hay que indicar cancha y horario");
+        }
+        Tournament tournament = match.getTournament();
+        int duration = tournament.getMatchDurationMinutes();
+
+        TimeSlot slot = TimeSlot.builder()
+                .date(scheduledStart.toLocalDate())
+                .startTime(scheduledStart.toLocalTime())
+                .endTime(scheduledStart.toLocalTime().plusMinutes(duration))
+                .courtId(courtId)
+                .build();
+
+        List<Match> otherScheduled = otherScheduledMatches(tournament.getId(), matchId);
+        Map<Long, List<PairScheduleConstraint>> constraints = buildConstraintsMap(List.of(match));
+        String reason = placementReason(match, slot, otherScheduled, tournament, constraints);
+        if (reason != null) {
+            throw new BusinessException("No se puede mover ahí: " + reason);
+        }
+        return updateMatchCourt(matchId, courtId, scheduledStart);
+    }
+
+    /** Partidos del torneo que ocupan cancha/horario (programados o jugados), excluyendo uno. */
+    private List<Match> otherScheduledMatches(Long tournamentId, Long excludeMatchId) {
+        List<Match> all = new ArrayList<>();
+        all.addAll(matchRepository.findByTournamentIdAndPhase(tournamentId, MatchPhase.ZONE));
+        all.addAll(matchRepository.findByTournamentIdAndPhase(tournamentId, MatchPhase.ELIMINATION));
+        return all.stream()
+                .filter(m -> !m.getId().equals(excludeMatchId))
+                .filter(m -> m.getScheduledStart() != null && m.getCourt() != null)
+                .collect(Collectors.toList());
+    }
+
+    /** Motivo por el que un partido NO puede ir a un slot (null = válido). Mismas reglas que isValidSlot (sin preferencias). */
+    private String placementReason(Match match, TimeSlot slot, List<Match> scheduled,
+                                   Tournament tournament, Map<Long, List<PairScheduleConstraint>> cons) {
+        Long p1 = match.getPair1().getId();
+        Long p2 = match.getPair2() != null ? match.getPair2().getId() : null;
+        if (isCourtOccupied(slot, scheduled)) return "Cancha ocupada";
+        if (isPairBusy(p1, slot, scheduled) || (p2 != null && isPairBusy(p2, slot, scheduled)))
+            return "Una pareja ya juega a esa hora";
+        int minInt = tournament.getMinIntervalMinutes();
+        if (violatesMinInterval(p1, slot, scheduled, minInt) || (p2 != null && violatesMinInterval(p2, slot, scheduled, minInt)))
+            return "No respeta el intervalo mínimo de la pareja";
+        if (violatesZoneRoundOrder(match, slot, scheduled)) return "La Ronda 2 debe ir después de la Ronda 1";
+        if (match.getPhase() == MatchPhase.ZONE) {
+            List<PairScheduleConstraint> c1 = cons.getOrDefault(p1, List.of());
+            List<PairScheduleConstraint> c2 = p2 != null ? cons.getOrDefault(p2, List.of()) : List.of();
+            if (violatesRestriction(slot, c1) || violatesRestriction(slot, c2))
+                return "Choca con una restricción horaria de la pareja";
+        }
+        return null;
     }
 
     private MatchPairDto toPairDto(Pair pair) {
