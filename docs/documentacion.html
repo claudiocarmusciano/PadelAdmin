@@ -1,0 +1,631 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>PadelAdmin — Documentación técnica</title>
+<style>
+  :root{
+    --bg:#0c0d10; --panel:#15171c; --panel2:#1b1e25; --border:#2a2e38;
+    --text:#e7e9ee; --muted:#9aa1ad; --accent:#FF9154; --accent2:#ff7a33;
+    --green:#34d399; --red:#f87171; --blue:#60a5fa; --indigo:#818cf8; --amber:#fbbf24;
+    --radius:14px;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{
+    margin:0; background:var(--bg); color:var(--text);
+    font:15px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
+  a{color:var(--accent); text-decoration:none}
+  a:hover{text-decoration:underline}
+  code{font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace; font-size:.86em;
+    background:#23262e; border:1px solid var(--border); padding:.08em .4em; border-radius:6px; color:#ffd9bf}
+  pre{background:#0a0b0e; border:1px solid var(--border); border-radius:10px; padding:14px 16px;
+    overflow:auto; font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace; font-size:12.5px; line-height:1.55; color:#cfd3db}
+  pre code{background:none;border:none;padding:0;color:inherit}
+
+  /* Layout */
+  .layout{display:flex; min-height:100vh}
+  .sidebar{
+    width:290px; flex:0 0 290px; position:sticky; top:0; height:100vh; overflow-y:auto;
+    background:var(--panel); border-right:1px solid var(--border); padding:22px 16px;
+  }
+  .brand{display:flex; align-items:center; gap:11px; margin-bottom:6px}
+  .brand .logo{width:38px;height:38px;border-radius:10px;background:linear-gradient(135deg,var(--accent),var(--accent2));
+    display:flex;align-items:center;justify-content:center;font-size:20px}
+  .brand h1{font-size:16px;margin:0;line-height:1.1}
+  .brand small{color:var(--muted);font-size:11.5px}
+  .search{width:100%; margin:14px 0 10px; padding:9px 12px; background:var(--panel2);
+    border:1px solid var(--border); border-radius:9px; color:var(--text); font-size:13px}
+  .search::placeholder{color:var(--muted)}
+  nav.toc a{display:block; color:var(--muted); padding:6px 11px; border-radius:8px; font-size:13px; line-height:1.3}
+  nav.toc a:hover{background:var(--panel2); color:var(--text); text-decoration:none}
+  nav.toc a.active{background:rgba(255,145,84,.14); color:var(--accent); font-weight:600}
+  nav.toc .num{display:inline-block; width:20px; color:var(--accent); font-weight:600}
+
+  .content{flex:1 1 auto; min-width:0; padding:40px 44px 120px; max-width:980px; margin:0 auto}
+  header.hero{margin-bottom:28px}
+  header.hero h1{font-size:30px; margin:0 0 6px}
+  header.hero .sub{color:var(--muted); font-size:15px}
+  .badges{margin-top:14px; display:flex; gap:8px; flex-wrap:wrap}
+  .badge{font-size:12px; padding:4px 10px; border-radius:999px; border:1px solid var(--border); background:var(--panel)}
+  .badge.accent{border-color:rgba(255,145,84,.4); background:rgba(255,145,84,.12); color:var(--accent)}
+
+  section.doc{margin-bottom:14px; background:var(--panel); border:1px solid var(--border); border-radius:var(--radius); overflow:hidden}
+  section.doc>.head{display:flex; align-items:center; gap:12px; cursor:pointer; padding:16px 20px; user-select:none}
+  section.doc>.head:hover{background:var(--panel2)}
+  section.doc>.head .ix{color:var(--accent); font-weight:700; font-size:13px; min-width:24px}
+  section.doc>.head h2{font-size:18px; margin:0; flex:1}
+  section.doc>.head .chev{color:var(--muted); transition:transform .2s}
+  section.doc.collapsed>.head .chev{transform:rotate(-90deg)}
+  section.doc>.body{padding:4px 22px 22px; border-top:1px solid var(--border)}
+  section.doc.collapsed>.body{display:none}
+  section.doc h3{font-size:15px; margin:22px 0 8px; color:var(--accent)}
+  section.doc h4{font-size:13.5px; margin:16px 0 6px; color:#ffd9bf; text-transform:uppercase; letter-spacing:.4px}
+  p{margin:9px 0}
+  ul,ol{margin:9px 0; padding-left:22px}
+  li{margin:4px 0}
+
+  table{width:100%; border-collapse:collapse; margin:12px 0; font-size:13px}
+  th,td{text-align:left; padding:8px 11px; border-bottom:1px solid var(--border); vertical-align:top}
+  th{color:var(--accent); font-weight:600; font-size:11.5px; text-transform:uppercase; letter-spacing:.4px}
+  tr:hover td{background:rgba(255,255,255,.02)}
+  .m{font-family:ui-monospace,monospace; font-size:11.5px; font-weight:700; padding:1px 7px; border-radius:5px}
+  .m.get{background:rgba(96,165,250,.15); color:var(--blue)}
+  .m.post{background:rgba(52,211,153,.15); color:var(--green)}
+  .m.put,.m.patch{background:rgba(251,191,36,.15); color:var(--amber)}
+  .m.del{background:rgba(248,113,113,.15); color:var(--red)}
+
+  .note{border-left:3px solid var(--accent); background:rgba(255,145,84,.07); padding:10px 14px; border-radius:0 8px 8px 0; margin:14px 0; font-size:13.5px}
+  .note.warn{border-color:var(--amber); background:rgba(251,191,36,.07)}
+  .grid2{display:grid; grid-template-columns:1fr 1fr; gap:14px}
+  @media(max-width:900px){.grid2{grid-template-columns:1fr}}
+  .card{background:var(--panel2); border:1px solid var(--border); border-radius:11px; padding:14px 16px}
+  .card h4{margin-top:0}
+
+  /* Stepper */
+  .steps{counter-reset:s; margin:10px 0}
+  .steps .step{position:relative; padding:10px 0 10px 46px; border-left:2px solid var(--border); margin-left:16px}
+  .steps .step::before{counter-increment:s; content:counter(s); position:absolute; left:-16px; top:8px;
+    width:30px;height:30px;border-radius:50%; background:var(--accent); color:#1a1205; font-weight:700;
+    display:flex;align-items:center;justify-content:center; font-size:13px}
+  .steps .step b{color:#fff}
+  .steps .step .d{color:var(--muted); font-size:13px}
+
+  .pill{display:inline-block;font-size:11px;padding:2px 9px;border-radius:999px;border:1px solid var(--border);margin:2px}
+  .pill.draft{color:var(--muted)} .pill.active{color:var(--accent);border-color:rgba(255,145,84,.4);background:rgba(255,145,84,.1)}
+  .pill.done{color:var(--green);border-color:rgba(52,211,153,.4);background:rgba(52,211,153,.08)}
+
+  .hidden{display:none !important}
+  mark{background:rgba(255,145,84,.35); color:#fff; border-radius:3px}
+  .toTop{position:fixed; right:22px; bottom:22px; width:44px;height:44px;border-radius:50%;
+    background:var(--accent); color:#1a1205; border:none; font-size:20px; cursor:pointer; display:none; box-shadow:0 6px 18px rgba(0,0,0,.4)}
+  .toTop.show{display:block}
+  .toolbar{display:flex; gap:8px; margin-bottom:18px; flex-wrap:wrap}
+  .toolbar button{background:var(--panel); border:1px solid var(--border); color:var(--text); padding:7px 13px;
+    border-radius:8px; cursor:pointer; font-size:12.5px}
+  .toolbar button:hover{border-color:var(--accent); color:var(--accent)}
+  .menuToggle{display:none}
+  @media(max-width:860px){
+    .sidebar{position:fixed; z-index:50; transform:translateX(-100%); transition:transform .25s}
+    .sidebar.open{transform:none}
+    .menuToggle{display:inline-flex; position:fixed; top:14px; left:14px; z-index:60; background:var(--accent);
+      color:#1a1205; border:none; width:42px;height:42px;border-radius:10px; font-size:20px; cursor:pointer}
+    .content{padding:64px 18px 100px}
+  }
+</style>
+</head>
+<body>
+<button class="menuToggle" onclick="document.querySelector('.sidebar').classList.toggle('open')">☰</button>
+<div class="layout">
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="logo">🎾</div>
+      <div><h1>PadelAdmin</h1><small>Documentación técnica</small></div>
+    </div>
+    <input class="search" id="search" placeholder="Buscar en la doc…" />
+    <nav class="toc" id="toc"></nav>
+  </aside>
+
+  <!-- CONTENT -->
+  <main class="content">
+    <header class="hero">
+      <h1>PadelAdmin — Documentación técnica</h1>
+      <div class="sub">Gestión de torneos de pádel · Spring Boot + React + PostgreSQL · una sola imagen Docker en Railway.</div>
+      <div class="badges">
+        <span class="badge accent">Spring Boot 4 · Java 21</span>
+        <span class="badge accent">React + Vite + TS</span>
+        <span class="badge">PostgreSQL</span>
+        <span class="badge">JWT</span>
+        <span class="badge">Railway</span>
+      </div>
+      <div class="toolbar" style="margin-top:18px">
+        <button onclick="setAll(false)">▸ Colapsar todo</button>
+        <button onclick="setAll(true)">▾ Expandir todo</button>
+        <button onclick="window.print()">🖨 Imprimir / PDF</button>
+      </div>
+    </header>
+
+    <!-- 1 -->
+    <section class="doc" id="s1" data-title="Qué es y para qué sirve">
+      <div class="head"><span class="ix">1</span><h2>Qué es y para qué sirve</h2><span class="chev">▾</span></div>
+      <div class="body">
+        <p><b>PadelAdmin</b> es un panel de administración de torneos de pádel. Permite a un club:</p>
+        <ul>
+          <li>Mantener un <b>padrón de jugadores</b> con puntos de ranking por categoría.</li>
+          <li>Definir <b>categorías</b>, <b>complejos</b> y <b>canchas</b> (con sus horarios).</li>
+          <li>Crear <b>torneos</b>, inscribir <b>parejas</b>, generar <b>zonas</b>, armar el <b>fixture</b>, cargar <b>resultados</b>, ver la <b>tabla de posiciones</b>, generar el <b>cuadro eliminatorio</b> y, al finalizar, <b>otorgar puntos</b> de ranking.</li>
+        </ul>
+        <p>Dos perfiles: <b>administrador</b> (gestiona todo) e <b>invitado/espectador</b> (modo lectura).</p>
+      </div>
+    </section>
+
+    <!-- 2 -->
+    <section class="doc" id="s2" data-title="Arquitectura general">
+      <div class="head"><span class="ix">2</span><h2>Arquitectura general</h2><span class="chev">▾</span></div>
+      <div class="body">
+        <p><b>Una sola aplicación desplegable.</b> El frontend se compila y queda <b>servido por el backend</b> como estáticos. Un único contenedor Docker contiene todo. PostgreSQL es un servicio gestionado aparte.</p>
+<pre><code>┌──────────────────────────────────────────────────────────┐
+│              Navegador (admin / invitado)                │
+│        React SPA (BrowserRouter, axios → /api)           │
+└─────────────────────────┬────────────────────────────────┘
+                          │ HTTP (mismo origen)
+                          ▼
+┌──────────────────────────────────────────────────────────┐
+│            Imagen Docker única (Railway)                 │
+│  Spring Boot:                                            │
+│   • sirve la SPA (resources/static) + deep links         │
+│   • API REST /api/** (Spring Security + JWT)             │
+│   • lógica de negocio (services) + JPA/Hibernate         │
+└─────────────────────────┬────────────────────────────────┘
+                          │ JDBC
+                          ▼
+                ┌────────────────────┐
+                │  PostgreSQL (Railway)│
+                └────────────────────┘</code></pre>
+        <h3>Construcción de la imagen (Dockerfile multi-stage)</h3>
+        <div class="steps">
+          <div class="step"><b>node:20-alpine</b><div class="d"><code>npm ci</code> + <code>npm run build</code> → compila el frontend a <code>dist/</code>.</div></div>
+          <div class="step"><b>maven:3.9-temurin-21</b><div class="d">copia <code>dist/</code> a <code>resources/static/</code> y empaqueta el <code>.jar</code> de Spring Boot.</div></div>
+          <div class="step"><b>temurin-21-jre</b><div class="d">runtime liviano que corre el <code>.jar</code>. Expone el puerto <code>8080</code>.</div></div>
+        </div>
+        <div class="note">Cada <code>git push</code> a <b>main</b> dispara build + deploy automático en Railway (~2–4 min). Un <code>SpaForwardController</code> reenvía los deep links de BrowserRouter a <code>index.html</code>.</div>
+      </div>
+    </section>
+
+    <!-- 3 -->
+    <section class="doc" id="s3" data-title="Stack tecnológico">
+      <div class="head"><span class="ix">3</span><h2>Stack tecnológico</h2><span class="chev">▾</span></div>
+      <div class="body">
+        <table>
+          <tr><th>Capa</th><th>Tecnología</th></tr>
+          <tr><td>Backend</td><td>Spring Boot <b>4.0.6</b>, Java <b>21</b>, Spring Security 6, Spring Data JPA / Hibernate</td></tr>
+          <tr><td>Auth</td><td>JWT stateless (TTL configurable)</td></tr>
+          <tr><td>DB</td><td>PostgreSQL · <code>ddl-auto=update</code> · sin Flyway/Liquibase</td></tr>
+          <tr><td>Frontend</td><td>React + TypeScript + <b>Vite</b></td></tr>
+          <tr><td>UI</td><td>Tailwind CSS + <b>shadcn/ui</b> (Radix) + lucide-react + recharts</td></tr>
+          <tr><td>Estado/datos</td><td><b>TanStack Query</b> (React Query) + axios</td></tr>
+          <tr><td>Build/Deploy</td><td>Docker multi-stage · Railway</td></tr>
+        </table>
+      </div>
+    </section>
+
+    <!-- 4 -->
+    <section class="doc" id="s4" data-title="Modelo de datos entidades">
+      <div class="head"><span class="ix">4</span><h2>Modelo de datos (entidades)</h2><span class="chev">▾</span></div>
+      <div class="body">
+        <p>~23 entidades JPA, agrupadas por dominio:</p>
+        <div class="grid2">
+          <div class="card"><h4>Maestros</h4>
+            <ul>
+              <li><b>Category</b> — categoría (ej: "6ta. Damas").</li>
+              <li><b>Player</b> — jugador (nombre, apellido, teléfono).</li>
+              <li><b>PlayerCategoryPoints</b> — puntos vigentes por categoría.</li>
+              <li><b>Complex / Court</b> — complejo y canchas.</li>
+              <li><b>CourtAvailability</b> — horario de cancha por día (open/close + <b>pulmón</b> breakStart/breakEnd).</li>
+              <li><b>User</b> — usuario (ADMIN | VIEWER).</li>
+            </ul>
+          </div>
+          <div class="card"><h4>Torneo y parejas</h4>
+            <ul>
+              <li><b>Tournament</b> — fechas, categoría, complejo, duración, intervalo, status, zoneDays.</li>
+              <li><b>Pair / PairPlayer</b> — pareja y sus 2 jugadores (con categoría de aporte).</li>
+              <li><b>PairScheduleConstraint</b> — <span class="pill">RESTRICTION</span> (no puede) / <span class="pill">PREFERENCE</span> (prefiere), día + franja.</li>
+            </ul>
+          </div>
+          <div class="card"><h4>Zonas y partidos</h4>
+            <ul>
+              <li><b>Zone / ZonePair</b> — grupo y posición de siembra.</li>
+              <li><b>Match</b> — partido (phase ZONE|ELIMINATION, zone, zoneRound, parejas, cancha, horario, status, bye, eliminationRound, bracketSlot).</li>
+              <li><b>MatchResult / MatchSet</b> — resultado y games por set.</li>
+            </ul>
+          </div>
+          <div class="card"><h4>Puntos / config</h4>
+            <ul>
+              <li><b>PointConfig</b> — puntos por etapa alcanzada.</li>
+              <li><b>TournamentPointAward</b> — historial plano (snapshot, sobrevive a borrados).</li>
+              <li><b>TournamentBuffer</b> — pulmón global por día.</li>
+              <li><b>GlobalSettings</b> — legacy (la UI ya no lo expone).</li>
+            </ul>
+          </div>
+        </div>
+        <h3>Enums</h3>
+        <table>
+          <tr><th>Enum</th><th>Valores</th></tr>
+          <tr><td><code>TournamentStatus</code></td><td>DRAFT · ACTIVE · COMPLETED</td></tr>
+          <tr><td><code>MatchPhase</code></td><td>ZONE · ELIMINATION</td></tr>
+          <tr><td><code>MatchStatus</code></td><td>PENDING · SCHEDULED · CONFIRMED · PLAYED · CANCELLED</td></tr>
+          <tr><td><code>ConstraintType</code></td><td>PREFERENCE · RESTRICTION</td></tr>
+          <tr><td><code>UserRole</code></td><td>ADMIN · VIEWER</td></tr>
+          <tr><td><code>TournamentStage</code></td><td>etapas para puntos (PARTICIPANT … CHAMPION)</td></tr>
+        </table>
+      </div>
+    </section>
+
+    <!-- 5 -->
+    <section class="doc" id="s5" data-title="Autenticación y roles">
+      <div class="head"><span class="ix">5</span><h2>Autenticación y roles</h2><span class="chev">▾</span></div>
+      <div class="body">
+        <ul>
+          <li><b>JWT stateless.</b> Token con <code>exp</code>; se manda en <code>Authorization: Bearer …</code>.</li>
+          <li><b>TTL</b> ~8 h. El frontend chequea la expiración del lado del cliente → <b>auto-logout</b> al vencer.</li>
+          <li>No autenticado → <b>401</b>. Autenticado sin permiso (VIEWER escribiendo) → <b>403</b>.</li>
+        </ul>
+        <div class="grid2">
+          <div class="card"><h4>ADMIN</h4><p>Gestiona todo: crea, edita y borra.</p></div>
+          <div class="card"><h4>VIEWER (invitado)</h4><p>Solo lectura. Ve todo, el backend bloquea escrituras (403) y el frontend oculta botones de admin y datos sensibles (restricciones horarias).</p></div>
+        </div>
+        <h3>Reglas de seguridad (en orden)</h3>
+<pre><code>OPTIONS /**                         → permitAll
+/api/auth/login | register | guest  → permitAll
+GET    /api/**                      → authenticated  (ADMIN o VIEWER)
+POST/PUT/PATCH/DELETE /api/**       → hasRole(ADMIN)
+anyRequest                          → permitAll       (SPA)</code></pre>
+        <div class="note"><b>Seeders:</b> <code>AdminSeeder</code> crea el admin desde env (<code>ADMIN_EMAIL/PASSWORD</code>). <code>GuestSeeder</code> crea <code>invitado@padel.com</code> (VIEWER); <code>POST /api/auth/guest</code> emite token de invitado sin password.</div>
+      </div>
+    </section>
+
+    <!-- 6 -->
+    <section class="doc" id="s6" data-title="Flujo principal ciclo de vida de un torneo">
+      <div class="head"><span class="ix">6</span><h2>Flujo principal: ciclo de vida de un torneo</h2><span class="chev">▾</span></div>
+      <div class="body">
+        <div class="steps">
+          <div class="step"><b>Crear torneo</b> <span class="pill draft">DRAFT</span><div class="d">nombre, fechas, categoría, complejo, duración de partido, intervalo mínimo.</div></div>
+          <div class="step"><b>Inscribir parejas</b><div class="d">2 jugadores c/u + la categoría con la que cada uno aporta puntos.</div></div>
+          <div class="step"><b>Generar zonas</b><div class="d">siembra serpiente (snake) por puntaje. Editable: mover/intercambiar parejas (borra el fixture).</div></div>
+          <div class="step"><b>Elegir días de juego + verificar horarios de canchas</b><div class="d">zoneDays habilita/bloquea días para todas las parejas.</div></div>
+          <div class="step"><b>Generar fixture</b> <span class="pill active">ACTIVE</span><div class="d">scheduler backtracking→greedy. El torneo pasa a ACTIVE si llegó la fecha de inicio. "Reordenar zonas" si quedan pendientes.</div></div>
+          <div class="step"><b>Cargar resultados de zona</b><div class="d">sets o W.O. En zona de 4 se crea la Ronda 2 al cargar la R1.</div></div>
+          <div class="step"><b>Tabla de posiciones (en vivo)</b><div class="d">desempates oficiales → clasificados.</div></div>
+          <div class="step"><b>Bracket</b><div class="d">vista previa → al completar zonas, auto-generación con nombres reales. Cargar resultados (el ganador avanza), programar cancha/día/hora.</div></div>
+          <div class="step"><b>Finalizar</b> <span class="pill done">COMPLETED</span><div class="d">otorga puntos de ranking (mejor instancia).</div></div>
+        </div>
+        <div class="note"><b>Estados:</b> <b>DRAFT</b> edición libre · <b>ACTIVE</b> automático al generar el fixture (no se setea a mano) · <b>COMPLETED</b> dispara los puntos. Ciertos campos (ej. intervalo mínimo) se pueden editar con fixture generado <b>si no hay resultados</b> (avisa que hay que regenerar).</div>
+      </div>
+    </section>
+
+    <!-- 7 -->
+    <section class="doc" id="s7" data-title="Zonas armado y clasificación">
+      <div class="head"><span class="ix">7</span><h2>Zonas: armado y clasificación</h2><span class="chev">▾</span></div>
+      <div class="body">
+        <h3>Generación (snake)</h3>
+        <ul>
+          <li>Parejas ordenadas por puntaje y repartidas con <b>siembra serpiente</b> para equilibrar.</li>
+          <li><b>Mínimo 6 parejas.</b> Zonas de <b>3</b> y <b>4</b>.</li>
+          <li>Editar zonas (sin fixture/resultados): mover o intercambiar parejas → borra el fixture.</li>
+        </ul>
+        <h3>Partidos por zona</h3>
+        <div class="grid2">
+          <div class="card"><h4>Zona de 3</h4><p>Todos contra todos: (1-2), (1-3), (2-3). Clasifican <b>2</b>.</p></div>
+          <div class="card"><h4>Zona de 4</h4><p>R1: 1°vs4°, 2°vs3°. R2 (al cargar R1): ganador vs ganador, perdedor vs perdedor. Clasifican <b>3</b>.</p></div>
+        </div>
+        <h3>Desempates</h3>
+        <p><b>Zona de 3:</b> victorias → dif. sets → dif. games → games a favor → games en contra → head-to-head → sorteo.<br>
+        <b>Zona de 4:</b> 1°=ganador del partido de ganadores, 2°=perdedor de ese partido, 3°=ganador del partido de perdedores.</p>
+        <div class="note">La tabla de posiciones (<code>GET /zones/{id}/standings</code>) se calcula <b>en vivo</b> desde los resultados.</div>
+      </div>
+    </section>
+
+    <!-- 8 -->
+    <section class="doc" id="s8" data-title="El scheduler del fixture">
+      <div class="head"><span class="ix">8</span><h2>El scheduler del fixture</h2><span class="chev">▾</span></div>
+      <div class="body">
+        <h3>1) Generación de slots</h3>
+        <p>Por cada cancha activa y cada día del torneo: se toma la disponibilidad del día (open/close), se generan slots cada <b>30 min</b> mientras <code>inicio + duración ≤ cierre</code>, y se descartan los que caen fuera de los días habilitados, dentro del <b>pulmón</b> de la cancha, o de un <b>buffer</b> del torneo.</p>
+        <h3>2) Restricciones al ubicar (isValidSlot)</h3>
+        <ol>
+          <li><b>Cancha libre</b> en ese slot.</li>
+          <li><b>Parejas libres</b> (sin partido solapado).</li>
+          <li><b>Intervalo mínimo</b> entre partidos de la misma pareja, <b>de inicio a inicio</b> (intervalo 120 → juega 10:00, el próximo ≥ 12:00).</li>
+          <li><b>Orden de rondas</b> (zona de 4): la R2 va después del fin de la R1.</li>
+          <li><b>Restricciones horarias</b> de las parejas (hard, fase de zona).</li>
+        </ol>
+        <p>Las <b>preferencias</b> son <i>soft</i>: se intentan respetar y se relajan si no hay forma.</p>
+        <h3>3) Algoritmo</h3>
+        <div class="steps">
+          <div class="step"><b>Ordenamiento MRV</b><div class="d">los partidos con menos slots compatibles se procesan primero.</div></div>
+          <div class="step"><b>Backtracking</b> (tope 3 s)<div class="d">busca una asignación completa (0 pendientes); prueba primero los slots que cumplen preferencias.</div></div>
+          <div class="step"><b>Si encuentra solución</b><div class="d">→ 0 pendientes.</div></div>
+          <div class="step"><b>Si no (o timeout)</b><div class="d">→ fallback a <b>greedy</b> best-effort. Nunca queda peor que greedy.</div></div>
+        </div>
+        <h3>Reordenar zonas para programar todo</h3>
+        <p>Si quedan pendientes (y sin resultados): intercambia parejas entre zonas (las <b>cabezas</b> nunca se mueven), evalúa cada swap in-memory y aplica el mejor (menos pendientes).</p>
+        <h3>Mover partido (Calendario)</h3>
+        <p>Grilla de horarios por cancha/día en <span style="color:var(--green)">verde</span> (válido) / <span style="color:var(--red)">rojo</span> (inválido, con motivo). El backend re-valida al persistir y rechaza destinos inválidos.</p>
+      </div>
+    </section>
+
+    <!-- 9 -->
+    <section class="doc" id="s9" data-title="Bracket eliminatorio">
+      <div class="head"><span class="ix">9</span><h2>Bracket eliminatorio</h2><span class="chev">▾</span></div>
+      <div class="body">
+        <h3>Siembra (templates FAP)</h3>
+        <ul>
+          <li><code>bracketSize = nextPowerOf2(numClasificados)</code>; las sobrantes son <b>BYE</b>.</li>
+          <li>Cruces de 1ª ronda según <b>templates oficiales de la FAP</b> (por nº de clasificados + inscriptos; de bracket 4 a 32).</li>
+          <li>Se evita que dos parejas de la misma zona se crucen en 1ª ronda. Los BYE avanzan automáticamente.</li>
+        </ul>
+        <h3>Vista previa vs real</h3>
+        <div class="grid2">
+          <div class="card"><h4>Vista previa</h4><p>Si las zonas no están completas: cuadro estructural con etiquetas por posición (<i>"1º Zona A vs 2º Zona D"</i>, "Ganador", "BYE"). No persiste.</p></div>
+          <div class="card"><h4>Auto-generación</h4><p>Cuando todas las zonas están jugadas, al abrir el Bracket se genera el cuadro real con los nombres de las clasificadas.</p></div>
+        </div>
+        <div class="note warn"><b>Desactualizado (stale):</b> si se corrige un resultado de zona y cambia la clasificación, se avisa y el admin decide regenerar. Si el bracket aún no empezó, se invalida y regenera solo.</div>
+        <h3>Resultados y programación</h3>
+        <ul>
+          <li>Al cargar un resultado, el <b>ganador avanza</b> al siguiente cruce. Editar revierte el avance previo (si el siguiente no se jugó).</li>
+          <li>El admin asigna <b>cancha, día y hora</b> a cada partido (incluso con parejas "Por definir"). El invitado solo <b>ve</b> la agenda.</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- 10 -->
+    <section class="doc" id="s10" data-title="Resultados y tabla de posiciones">
+      <div class="head"><span class="ix">10</span><h2>Resultados y tabla de posiciones</h2><span class="chev">▾</span></div>
+      <div class="body">
+        <ul>
+          <li><b>Cargar resultado:</b> 2 o 3 sets (games). También <b>W.O.</b> (la pareja ausente pierde 6-0/6-0).</li>
+          <li><b>Editar:</b> borra el resultado anterior y registra el nuevo (en eliminación revierte el avance).</li>
+          <li><b>Visualización:</b> el marcador muestra los <b>games de la pareja ganadora primero</b> (ej: <code>6-1 7-5</code>).</li>
+          <li><b>Posiciones:</b> en vivo por zona, con los desempates oficiales.</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- 11 -->
+    <section class="doc" id="s11" data-title="Puntos y ranking">
+      <div class="head"><span class="ix">11</span><h2>Puntos y ranking</h2><span class="chev">▾</span></div>
+      <div class="body">
+        <p>Cada <b>etapa</b> alcanzada otorga puntos (<code>PointConfig</code>): Participante, Pasa zona, 32avos, 16avos, Octavos, Cuartos, Semifinal, Finalista, Campeón.</p>
+        <ul>
+          <li>Al pasar a <b>COMPLETED</b>, se otorgan según la <b>mejor instancia</b> de la pareja (solo la mejor, no acumulativo entre etapas) y se <b>suma</b> al ranking vigente del jugador (acumulativo).</li>
+          <li>Se guarda en <b>TournamentPointAward</b> (snapshot que sobrevive a borrados).</li>
+          <li><b>Nueva temporada:</b> reinicia a 0 los puntos vigentes conservando el historial.</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- 12 -->
+    <section class="doc" id="s12" data-title="API REST endpoints">
+      <div class="head"><span class="ix">12</span><h2>API REST (endpoints)</h2><span class="chev">▾</span></div>
+      <div class="body">
+        <div class="note">Todo bajo <code>/api</code>. <span class="m get">GET</span> = autenticado · <span class="m post">POST</span><span class="m put">PUT</span><span class="m patch">PATCH</span><span class="m del">DEL</span> = ADMIN · <code>auth/login|register|guest</code> = público.</div>
+        <h3>Auth · <code>/api/auth</code></h3>
+        <table>
+          <tr><th>Método</th><th>Ruta</th><th>Descripción</th></tr>
+          <tr><td><span class="m post">POST</span></td><td><code>/register</code></td><td>Registro</td></tr>
+          <tr><td><span class="m post">POST</span></td><td><code>/login</code></td><td>Login (JWT)</td></tr>
+          <tr><td><span class="m post">POST</span></td><td><code>/guest</code></td><td>Token invitado</td></tr>
+          <tr><td><span class="m get">GET</span></td><td><code>/me</code></td><td>Usuario actual</td></tr>
+        </table>
+        <h3>Torneos · <code>/api/tournaments</code></h3>
+        <table>
+          <tr><th>Método</th><th>Ruta</th><th>Descripción</th></tr>
+          <tr><td><span class="m get">GET</span></td><td><code>/</code> · <code>/{id}</code></td><td>Listar / detalle</td></tr>
+          <tr><td><span class="m post">POST</span></td><td><code>/</code></td><td>Crear</td></tr>
+          <tr><td><span class="m put">PUT</span></td><td><code>/{id}</code></td><td>Editar</td></tr>
+          <tr><td><span class="m patch">PATCH</span></td><td><code>/{id}/status</code></td><td>Cambiar estado (COMPLETED)</td></tr>
+          <tr><td><span class="m put">PUT</span></td><td><code>/{id}/zone-days</code></td><td>Días de juego</td></tr>
+          <tr><td><span class="m del">DEL</span></td><td><code>/{id}</code></td><td>Eliminar</td></tr>
+        </table>
+        <h3>Parejas · <code>/api/tournaments/{tid}/pairs</code></h3>
+        <table>
+          <tr><th>Método</th><th>Ruta</th><th>Descripción</th></tr>
+          <tr><td><span class="m get">GET</span></td><td><code>/</code> · <code>/{pairId}</code></td><td>Listar / detalle</td></tr>
+          <tr><td><span class="m post">POST</span></td><td><code>/</code></td><td>Crear pareja</td></tr>
+          <tr><td><span class="m del">DEL</span></td><td><code>/{pairId}</code></td><td>Borrar (limpia zonas+fixture)</td></tr>
+          <tr><td><span class="m post">POST</span></td><td><code>/{pairId}/constraints</code></td><td>Agregar restricción/preferencia</td></tr>
+          <tr><td><span class="m del">DEL</span></td><td><code>/{pairId}/constraints/{cid}</code></td><td>Quitar</td></tr>
+        </table>
+        <h3>Zonas · <code>/api/tournaments/{tid}/zones</code></h3>
+        <table>
+          <tr><th>Método</th><th>Ruta</th><th>Descripción</th></tr>
+          <tr><td><span class="m post">POST</span></td><td><code>/generate</code></td><td>Generar (snake)</td></tr>
+          <tr><td><span class="m get">GET</span></td><td><code>/</code> · <code>/{zoneId}</code></td><td>Listar / detalle</td></tr>
+          <tr><td><span class="m patch">PATCH</span></td><td><code>/pairs/{pairId}/move</code> · <code>/swap</code></td><td>Mover / intercambiar</td></tr>
+        </table>
+        <h3>Fixture · <code>/api/tournaments/{tid}/fixture</code></h3>
+        <table>
+          <tr><th>Método</th><th>Ruta</th><th>Descripción</th></tr>
+          <tr><td><span class="m post">POST</span></td><td><code>/generate</code></td><td>Generar/rehacer</td></tr>
+          <tr><td><span class="m get">GET</span></td><td><code>/</code></td><td>Obtener</td></tr>
+          <tr><td><span class="m post">POST</span></td><td><code>/schedule-pending</code></td><td>Programar Ronda 2</td></tr>
+          <tr><td><span class="m post">POST</span></td><td><code>/reorganize</code></td><td>Reordenar zonas</td></tr>
+        </table>
+        <h3>Eliminación · <code>/api/tournaments/{tid}/elimination</code></h3>
+        <table>
+          <tr><th>Método</th><th>Ruta</th><th>Descripción</th></tr>
+          <tr><td><span class="m post">POST</span></td><td><code>/generate</code></td><td>Generar/regenerar bracket</td></tr>
+          <tr><td><span class="m get">GET</span></td><td><code>/</code></td><td>Bracket (real/preview/auto)</td></tr>
+        </table>
+        <h3>Partidos · <code>/api/matches/{mid}</code></h3>
+        <table>
+          <tr><th>Método</th><th>Ruta</th><th>Descripción</th></tr>
+          <tr><td><span class="m post">POST</span></td><td><code>/result</code></td><td>Cargar resultado</td></tr>
+          <tr><td><span class="m put">PUT</span></td><td><code>/result</code></td><td>Editar resultado</td></tr>
+          <tr><td><span class="m get">GET</span></td><td><code>/result</code></td><td>Obtener</td></tr>
+          <tr><td><span class="m patch">PATCH</span></td><td><code>/court</code></td><td>Asignar cancha/horario</td></tr>
+          <tr><td><span class="m get">GET</span></td><td><code>/placements</code></td><td>Destinos válidos (verde/rojo)</td></tr>
+          <tr><td><span class="m patch">PATCH</span></td><td><code>/move</code></td><td>Mover (valida)</td></tr>
+          <tr><td><span class="m get">GET</span></td><td><code>/zones/{zid}/standings</code></td><td>Posiciones de zona</td></tr>
+        </table>
+        <h3>Maestros y config</h3>
+        <table>
+          <tr><th>Recurso</th><th>Rutas</th></tr>
+          <tr><td>Categorías</td><td><code>/api/categories</code> — GET, /{id}, POST, PUT, DELETE</td></tr>
+          <tr><td>Jugadores</td><td><code>/api/players</code> — GET, /with-categories, /{id}, /{id}/stats, POST, PUT, DELETE, /{id}/categories…</td></tr>
+          <tr><td>Complejos</td><td><code>/api/complexes</code> — GET, POST, PUT, DELETE, /{id}/courts…, toggle</td></tr>
+          <tr><td>Horarios cancha</td><td><code>/api/courts/{id}/availability</code> — GET, POST, DELETE, /copy-to-complex</td></tr>
+          <tr><td>Buffers</td><td><code>/api/tournaments/{tid}/buffers</code> — GET, POST, DELETE</td></tr>
+          <tr><td>Settings</td><td><code>/api/settings</code> — /points (GET/PUT), /points/reset, /general (GET/PUT)</td></tr>
+        </table>
+      </div>
+    </section>
+
+    <!-- 13 -->
+    <section class="doc" id="s13" data-title="Frontend">
+      <div class="head"><span class="ix">13</span><h2>Frontend</h2><span class="chev">▾</span></div>
+      <div class="body">
+<pre><code>frontend/src/
+  api/         clientes axios por dominio
+  pages/       Login, Register, Tournaments, Players, Categories,
+               Complexes, Settings, TournamentDetail
+  pages/tournament/  PairsTab · ZonesTab · FixtureTab · CalendarTab · BracketTab
+  components/  ui/ (shadcn) · courts/CourtAvailabilityDialog · …
+  contexts/    AuthContext (sesión + rol)
+  lib/         axios (baseURL /api) · utils
+  types/       tipos TS compartidos</code></pre>
+        <h3>Pestañas del torneo</h3>
+        <table>
+          <tr><th>Tab</th><th>Qué hace</th></tr>
+          <tr><td>Parejas</td><td>Alta/baja, restricciones/preferencias (ocultas al invitado).</td></tr>
+          <tr><td>Zonas</td><td>Generar, mover/intercambiar, tabla de posiciones.</td></tr>
+          <tr><td>Fixture</td><td>Días de juego, generar/rehacer, reordenar zonas, filtros (jugador sin acentos, zona, estado).</td></tr>
+          <tr><td>Calendario</td><td>Grilla por día/cancha; "Mover partido" verde/rojo.</td></tr>
+          <tr><td>Bracket</td><td>Cuadro (preview/real), resultados, programar cancha/día/hora.</td></tr>
+        </table>
+        <div class="note"><b>React Query</b> con <code>staleTime</code> 30 s; las mutaciones invalidan <code>fixture/bracket/standings/pairs…</code> para refrescar.</div>
+      </div>
+    </section>
+
+    <!-- 14 -->
+    <section class="doc" id="s14" data-title="Configuración entornos y deploy">
+      <div class="head"><span class="ix">14</span><h2>Configuración, entornos y deploy</h2><span class="chev">▾</span></div>
+      <div class="body">
+        <h3>Variables de entorno</h3>
+        <table>
+          <tr><th>Variable</th><th>Uso</th></tr>
+          <tr><td><code>datasource.url/username/password</code></td><td>Conexión PostgreSQL</td></tr>
+          <tr><td><code>JPA_DDL_AUTO</code></td><td><code>update</code> (crea/actualiza esquema)</td></tr>
+          <tr><td><code>PORT</code></td><td>Puerto HTTP (8080)</td></tr>
+          <tr><td><code>app.jwt.secret</code> / <code>ttl-hours</code></td><td>Firma y duración del JWT</td></tr>
+          <tr><td><code>ADMIN_EMAIL</code> / <code>ADMIN_PASSWORD</code></td><td>Credenciales del admin (seeder)</td></tr>
+          <tr><td><code>APP_CORS_EXTRA_ORIGINS</code></td><td>Orígenes CORS extra</td></tr>
+        </table>
+        <h3>Correr en local</h3>
+        <ul>
+          <li><b>Backend:</b> <code>./mvnw spring-boot:run</code> (8080). No recarga <code>.java</code> solo → Stop+Run en el IDE.</li>
+          <li><b>Frontend:</b> <code>npm run dev</code> (5173, con <code>.env.development</code> → <code>localhost:8080/api</code>).</li>
+          <li><b>DB:</b> Postgres local; sin <code>psql</code> se usa Docker <code>postgres:18</code>.</li>
+        </ul>
+        <div class="note">Push a <b>main</b> → build + deploy en Railway. CORS permite <code>localhost</code> y <code>*.up.railway.app</code>.</div>
+      </div>
+    </section>
+
+    <!-- 15 -->
+    <section class="doc" id="s15" data-title="Decisiones de diseño y limitaciones">
+      <div class="head"><span class="ix">15</span><h2>Decisiones de diseño y limitaciones</h2><span class="chev">▾</span></div>
+      <div class="body">
+        <ul>
+          <li><b>Sin migraciones</b> (Flyway/Liquibase): <code>ddl-auto=update</code> + un <code>SchemaPatcher</code> para casos especiales. <i>Pendiente versionar.</i></li>
+          <li><b>Sin tests automatizados</b>: todo se prueba manual / curl.</li>
+          <li><b>Concurrencia "último que guarda gana"</b>: sin optimistic locking; dos admins editando el mismo dato pueden pisarse.</li>
+          <li><b>Scheduler</b>: backtracking con tope de 3 s + fallback greedy; no garantiza óptimo global en casos enormes.</li>
+          <li><b>Pulmón/horarios</b> por <b>día de semana</b>, no por fecha puntual.</li>
+          <li><b>Un torneo = un complejo</b>; "reordenar zonas" solo avisa "sumá canchas".</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- 16 -->
+    <section class="doc" id="s16" data-title="En desarrollo roadmap">
+      <div class="head"><span class="ix">16</span><h2>En desarrollo / roadmap</h2><span class="chev">▾</span></div>
+      <div class="body">
+        <ul>
+          <li><b>Turnos online</b> (reserva de canchas) — rama <code>feature/court-booking</code>, en stand-by (ver <code>HANDOFF_TURNOS_ONLINE.md</code>).</li>
+          <li><b>Ronda 2 de zona de 4 programada por adelantado</b> (placeholders + restricciones de las 4 parejas).</li>
+          <li>Multi-complejo real · optimistic locking · migraciones · tests/CI.</li>
+          <li><b>Monetización</b>: inscripción online → pago/seña con Mercado Pago (marketplace/split).</li>
+        </ul>
+        <p style="color:var(--muted);font-size:13px;margin-top:18px">Documento generado para PadelAdmin · CODE SOLUTIONS.ar — Claudio Carmusciano.</p>
+      </div>
+    </section>
+  </main>
+</div>
+<button class="toTop" id="toTop" onclick="scrollTo({top:0,behavior:'smooth'})">↑</button>
+
+<script>
+  // Build TOC from sections
+  const secs = [...document.querySelectorAll('section.doc')];
+  const toc = document.getElementById('toc');
+  secs.forEach((s,i)=>{
+    const title = s.querySelector('.head h2').textContent;
+    const a = document.createElement('a');
+    a.href = '#'+s.id;
+    a.innerHTML = '<span class="num">'+(i+1)+'</span>'+title.replace(/^\d+\.?\s*/,'');
+    a.onclick = ()=>{ if(s.classList.contains('collapsed')) s.classList.remove('collapsed');
+      document.querySelector('.sidebar').classList.remove('open'); };
+    toc.appendChild(a);
+  });
+  const links = [...toc.querySelectorAll('a')];
+
+  // Collapsible
+  secs.forEach(s=> s.querySelector('.head').addEventListener('click', e=>{
+    if(e.target.tagName==='A') return;
+    s.classList.toggle('collapsed');
+  }));
+  window.setAll = open => secs.forEach(s=> s.classList.toggle('collapsed', !open));
+
+  // Scrollspy
+  const obs = new IntersectionObserver(entries=>{
+    entries.forEach(en=>{
+      if(en.isIntersecting){
+        const id = en.target.id;
+        links.forEach(l=> l.classList.toggle('active', l.getAttribute('href')==='#'+id));
+      }
+    });
+  }, {rootMargin:'-20% 0px -70% 0px', threshold:0});
+  secs.forEach(s=>obs.observe(s));
+
+  // Back to top
+  const toTop = document.getElementById('toTop');
+  addEventListener('scroll', ()=> toTop.classList.toggle('show', scrollY>500));
+
+  // Search filter + highlight
+  const search = document.getElementById('search');
+  function clearHL(el){ el.querySelectorAll('mark').forEach(m=>{ m.replaceWith(document.createTextNode(m.textContent)); }); el.normalize(); }
+  function hl(el,q){
+    const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+    const re = new RegExp('('+q.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+')','gi');
+    const nodes=[]; let n; while(n=walker.nextNode()){ if(n.nodeValue.toLowerCase().includes(q.toLowerCase())) nodes.push(n); }
+    nodes.forEach(node=>{
+      const span=document.createElement('span'); span.innerHTML=node.nodeValue.replace(re,'<mark>$1</mark>');
+      node.replaceWith(span);
+    });
+  }
+  search.addEventListener('input', ()=>{
+    const q = search.value.trim();
+    secs.forEach(s=>{
+      clearHL(s);
+      if(!q){ s.classList.remove('hidden'); return; }
+      const match = s.dataset.title.toLowerCase().includes(q.toLowerCase()) || s.textContent.toLowerCase().includes(q.toLowerCase());
+      s.classList.toggle('hidden', !match);
+      if(match){ s.classList.remove('collapsed'); hl(s.querySelector('.body'), q); }
+    });
+    links.forEach((l,i)=> l.classList.toggle('hidden', secs[i].classList.contains('hidden')));
+  });
+</script>
+</body>
+</html>
