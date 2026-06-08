@@ -984,8 +984,12 @@ public class FixtureService {
                 match.setScheduledEnd(scheduledStart.plusMinutes(duration));
             }
 
-            // Determinar estado según disponibilidad de información
-            if (match.getScheduledStart() != null) {
+            // Determinar estado según disponibilidad de información.
+            // OJO: no degradar un partido ya JUGADO — reprogramarlo solo cambia cancha/hora,
+            // su resultado se conserva y sigue PLAYED.
+            if (match.getScheduledStart() != null
+                    && match.getStatus() != MatchStatus.PLAYED
+                    && match.getStatus() != MatchStatus.CANCELLED) {
                 match.setStatus(MatchStatus.SCHEDULED);
             }
         }

@@ -47,6 +47,13 @@ public class MatchResultService {
             throw new BusinessException("No se puede cargar resultado de un partido con BYE");
         }
 
+        // Recuperación: si quedó un resultado huérfano (ej: se reprogramó un partido jugado y su
+        // estado se había degradado), lo borramos antes de crear el nuevo para no chocar con la FK.
+        matchResultRepository.findByMatchId(matchId).ifPresent(existing -> {
+            matchResultRepository.delete(existing);
+            matchResultRepository.flush();
+        });
+
         int pair1Sets, pair2Sets;
         Pair winner;
         List<SetScoreDto> setScores;
