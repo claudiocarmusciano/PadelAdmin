@@ -478,7 +478,7 @@ export default function CalendarTab({ tournamentId }: Props) {
   const playedNoSchedule = unscheduled.filter((m) => m.status === 'PLAYED')
 
   if (isLoading) {
-    return <p className="text-sm text-muted-foreground">Cargando calendario...</p>
+    return <p className="text-sm text-muted-foreground">Cargando cronograma...</p>
   }
 
   if (!fixture || fixture.matches.length === 0) {
@@ -487,7 +487,7 @@ export default function CalendarTab({ tournamentId }: Props) {
         <CardContent className="flex flex-col items-center justify-center py-12 gap-3 text-center">
           <Calendar size={32} className="text-muted-foreground" />
           <p className="font-medium text-sm">El fixture aún no fue generado</p>
-          <p className="text-xs text-muted-foreground">Generá el fixture desde la pestaña "Fixture" para ver el calendario</p>
+          <p className="text-xs text-muted-foreground">Generá el fixture desde la pestaña "Fixture" para ver el cronograma</p>
         </CardContent>
       </Card>
     )

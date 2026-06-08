@@ -29,7 +29,7 @@ const tabs = [
   { path: 'pairs', label: 'Parejas' },
   { path: 'zones', label: 'Zonas' },
   { path: 'fixture', label: 'Fixture/Resultados' },
-  { path: 'calendar', label: 'Calendario' },
+  { path: 'calendar', label: 'Cronograma' },
   { path: 'bracket', label: 'Llaves' },
 ]
 
