@@ -10,9 +10,11 @@ import com.padeladmin.padeladmin.exception.BusinessException;
 import com.padeladmin.padeladmin.exception.ResourceNotFoundException;
 import com.padeladmin.padeladmin.repository.AvailabilityWindowRepository;
 import com.padeladmin.padeladmin.repository.CategoryRepository;
+import com.padeladmin.padeladmin.repository.ClubRepository;
 import com.padeladmin.padeladmin.repository.ComplexRepository;
 import com.padeladmin.padeladmin.repository.MatchRepository;
 import com.padeladmin.padeladmin.repository.TournamentRepository;
+import com.padeladmin.padeladmin.security.TenantContext;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -35,17 +37,25 @@ public class TournamentService {
     private final AvailabilityWindowRepository availabilityWindowRepository;
     private final TournamentPointsService tournamentPointsService;
     private final JdbcTemplate jdbcTemplate;
+    private final TenantContext tenantContext;
+    private final ClubRepository clubRepository;
 
     public List<TournamentResponseDto> findAll() {
         return tournamentRepository.findAllByOrderByCreatedAtDesc().stream()
+                .filter(this::visibleForCurrentUser)
                 .map(this::toDto)
                 .toList();
     }
 
     public List<TournamentResponseDto> findByStatus(TournamentStatus status) {
         return tournamentRepository.findByStatus(status).stream()
+                .filter(this::visibleForCurrentUser)
                 .map(this::toDto)
                 .toList();
+    }
+
+    private boolean visibleForCurrentUser(Tournament t) {
+        return tenantContext.canAccessClub(t.getClub() != null ? t.getClub().getId() : null);
     }
 
     public TournamentResponseDto findById(Long id) {
@@ -59,17 +69,19 @@ public class TournamentService {
         }
 
         String name = dto.getName() == null ? "" : dto.getName().trim();
-        if (tournamentRepository.existsByNameIgnoreCase(name)) {
+        if (nameTakenInClub(name, null)) {
             throw new BusinessException("Ya existe un torneo con el nombre \"" + name + "\". Elegí otro nombre.");
         }
 
         Category category = categoryRepository.findById(dto.getCategoryId())
                 .orElseThrow(() -> new ResourceNotFoundException("Categoría", dto.getCategoryId()));
+        requireSameClub(category.getClub() != null ? category.getClub().getId() : null, "Categoría", dto.getCategoryId());
 
         Complex complex = null;
         if (dto.getComplexId() != null) {
             complex = complexRepository.findById(dto.getComplexId())
                     .orElseThrow(() -> new ResourceNotFoundException("Complejo", dto.getComplexId()));
+            requireSameClub(complex.getClub() != null ? complex.getClub().getId() : null, "Complejo", dto.getComplexId());
         }
 
         Tournament tournament = Tournament.builder()
@@ -82,6 +94,9 @@ public class TournamentService {
                 .minIntervalMinutes(dto.getMinIntervalMinutes())
                 .status(TournamentStatus.DRAFT)   // siempre inicia en borrador
                 .build();
+        // Los torneos creados por un usuario CLUB nacen dentro de su club.
+        tenantContext.restrictedClubId().ifPresent(clubId ->
+                tournament.setClub(clubRepository.getReferenceById(clubId)));
 
         return toDto(tournamentRepository.save(tournament));
     }
@@ -103,17 +118,19 @@ public class TournamentService {
         }
 
         String name = dto.getName() == null ? "" : dto.getName().trim();
-        if (tournamentRepository.existsByNameIgnoreCaseAndIdNot(name, id)) {
+        if (nameTakenInClub(name, id)) {
             throw new BusinessException("Ya existe otro torneo con el nombre \"" + name + "\". Elegí otro nombre.");
         }
 
         Category category = categoryRepository.findById(dto.getCategoryId())
                 .orElseThrow(() -> new ResourceNotFoundException("Categoría", dto.getCategoryId()));
+        requireSameClub(category.getClub() != null ? category.getClub().getId() : null, "Categoría", dto.getCategoryId());
 
         Complex complex = null;
         if (dto.getComplexId() != null) {
             complex = complexRepository.findById(dto.getComplexId())
                     .orElseThrow(() -> new ResourceNotFoundException("Complejo", dto.getComplexId()));
+            requireSameClub(complex.getClub() != null ? complex.getClub().getId() : null, "Complejo", dto.getComplexId());
         }
 
         tournament.setName(name);
@@ -233,6 +250,25 @@ public class TournamentService {
     private Tournament getOrThrow(Long id) {
         return tournamentRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Torneo", id));
+    }
+
+    /**
+     * Unicidad de nombre dentro del mismo club (los clubes no compiten entre sí por nombres).
+     * Para usuarios globales (ADMIN) el chequeo sigue siendo global, como hasta ahora.
+     */
+    private boolean nameTakenInClub(String name, Long excludeId) {
+        Long clubId = tenantContext.restrictedClubId().orElse(null);
+        return tournamentRepository.findAllByOrderByCreatedAtDesc().stream()
+                .filter(t -> excludeId == null || !t.getId().equals(excludeId))
+                .filter(t -> clubId == null || (t.getClub() != null && clubId.equals(t.getClub().getId())))
+                .anyMatch(t -> t.getName().equalsIgnoreCase(name));
+    }
+
+    /** Un usuario CLUB solo puede referenciar categorías/complejos de su propio club. */
+    private void requireSameClub(Long resourceClubId, String entity, Long resourceId) {
+        if (!tenantContext.canAccessClub(resourceClubId)) {
+            throw new ResourceNotFoundException(entity, resourceId);
+        }
     }
 
     private TournamentResponseDto toDto(Tournament t) {

@@ -1,21 +1,34 @@
 import { createContext, useContext, useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
-import { login as apiLogin, register as apiRegister, guestLogin as apiGuestLogin, type UserRole } from '@/api/auth'
+import {
+  login as apiLogin,
+  register as apiRegister,
+  guestLogin as apiGuestLogin,
+  type AuthResponse,
+  type UserRole,
+} from '@/api/auth'
 import { getStoredToken, setStoredToken, isTokenExpired } from '@/lib/axios'
 
 interface AuthUser {
   email: string
   role: UserRole
+  mustChangePassword?: boolean
+  clubId?: number | null
 }
 
 interface AuthContextValue {
   user: AuthUser | null
   isAuthenticated: boolean
+  /** Puede gestionar datos: ADMIN global o usuario CLUB (limitado a su club por el backend). */
   isAdmin: boolean
+  /** Solo el ADMIN global: gestión de clubes y configuración general. */
+  isSuperAdmin: boolean
   loading: boolean
   login: (email: string, password: string) => Promise<void>
   register: (email: string, password: string) => Promise<void>
   loginAsGuest: () => Promise<void>
+  /** Actualiza sesión tras un cambio de contraseña exitoso (token nuevo, flag apagado). */
+  applyAuthResponse: (res: AuthResponse) => void
   logout: () => void
 }
 
@@ -59,14 +72,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => window.removeEventListener('storage', onStorage)
   }, [])
 
+  function applyAuthResponse(res: AuthResponse) {
+    setStoredToken(res.token)
+    const next: AuthUser = {
+      email: res.email,
+      role: res.role,
+      mustChangePassword: res.mustChangePassword ?? false,
+      clubId: res.clubId ?? null,
+    }
+    localStorage.setItem(USER_KEY, JSON.stringify(next))
+    setUser(next)
+  }
+
   async function login(email: string, password: string) {
     setLoading(true)
     try {
-      const res = await apiLogin(email, password)
-      setStoredToken(res.token)
-      const next = { email: res.email, role: res.role }
-      localStorage.setItem(USER_KEY, JSON.stringify(next))
-      setUser(next)
+      applyAuthResponse(await apiLogin(email, password))
     } finally {
       setLoading(false)
     }
@@ -75,11 +96,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   async function register(email: string, password: string) {
     setLoading(true)
     try {
-      const res = await apiRegister(email, password)
-      setStoredToken(res.token)
-      const next = { email: res.email, role: res.role }
-      localStorage.setItem(USER_KEY, JSON.stringify(next))
-      setUser(next)
+      applyAuthResponse(await apiRegister(email, password))
     } finally {
       setLoading(false)
     }
@@ -88,11 +105,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   async function loginAsGuest() {
     setLoading(true)
     try {
-      const res = await apiGuestLogin()
-      setStoredToken(res.token)
-      const next = { email: res.email, role: res.role }
-      localStorage.setItem(USER_KEY, JSON.stringify(next))
-      setUser(next)
+      applyAuthResponse(await apiGuestLogin())
     } finally {
       setLoading(false)
     }
@@ -107,11 +120,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const value: AuthContextValue = {
     user,
     isAuthenticated: !!user,
-    isAdmin: user?.role === 'ADMIN',
+    isAdmin: user?.role === 'ADMIN' || user?.role === 'CLUB',
+    isSuperAdmin: user?.role === 'ADMIN',
     loading,
     login,
     register,
     loginAsGuest,
+    applyAuthResponse,
     logout,
   }
 

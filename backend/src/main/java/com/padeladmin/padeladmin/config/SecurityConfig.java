@@ -36,15 +36,21 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         // Endpoints públicos de autenticación
                         .requestMatchers("/api/auth/login", "/api/auth/register", "/api/auth/guest").permitAll()
+                        // Cambio de contraseña: cualquier usuario logueado (incluye primer ingreso)
+                        .requestMatchers("/api/auth/change-password").authenticated()
                         // Gestión de clubes: SOLO super-admin (hoy = rol ADMIN), todos los métodos.
                         .requestMatchers("/api/clubs/**").hasRole("ADMIN")
+                        // Configuración global (puntos, etc.): escribe solo el super-admin
+                        .requestMatchers(HttpMethod.PUT, "/api/settings/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.POST, "/api/settings/**").hasRole("ADMIN")
                         // Lectura: cualquier usuario autenticado
                         .requestMatchers(HttpMethod.GET, "/api/**").authenticated()
-                        // Escritura: solo ADMIN
-                        .requestMatchers(HttpMethod.POST, "/api/**").hasRole("ADMIN")
-                        .requestMatchers(HttpMethod.PUT, "/api/**").hasRole("ADMIN")
-                        .requestMatchers(HttpMethod.PATCH, "/api/**").hasRole("ADMIN")
-                        .requestMatchers(HttpMethod.DELETE, "/api/**").hasRole("ADMIN")
+                        // Escritura: ADMIN global o CLUB (este último limitado a su club por
+                        // TenantIsolationInterceptor + filtros en los services)
+                        .requestMatchers(HttpMethod.POST, "/api/**").hasAnyRole("ADMIN", "CLUB")
+                        .requestMatchers(HttpMethod.PUT, "/api/**").hasAnyRole("ADMIN", "CLUB")
+                        .requestMatchers(HttpMethod.PATCH, "/api/**").hasAnyRole("ADMIN", "CLUB")
+                        .requestMatchers(HttpMethod.DELETE, "/api/**").hasAnyRole("ADMIN", "CLUB")
                         // Frontend (SPA) servido por el backend: estáticos y rutas de cliente
                         // son públicos. Los datos sensibles están detrás de /api (protegido arriba).
                         .anyRequest().permitAll()

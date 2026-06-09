@@ -65,6 +65,29 @@ public class AuthService {
         return buildAuthResponse(user);
     }
 
+    /**
+     * Cambio de contraseña del usuario autenticado. Usado también en el primer ingreso
+     * (mustChangePassword): al completarse, el flag se apaga y se emite un token nuevo.
+     */
+    @Transactional
+    public AuthResponse changePassword(String email, com.padeladmin.padeladmin.dto.auth.ChangePasswordRequest request) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new BusinessException("Usuario no encontrado"));
+
+        if (!passwordEncoder.matches(request.currentPassword(), user.getPasswordHash())) {
+            throw new BusinessException("La contraseña actual es incorrecta");
+        }
+        if (passwordEncoder.matches(request.newPassword(), user.getPasswordHash())) {
+            throw new BusinessException("La contraseña nueva no puede ser igual a la actual");
+        }
+
+        user.setPasswordHash(passwordEncoder.encode(request.newPassword()));
+        user.setMustChangePassword(false);
+        userRepository.save(user);
+
+        return buildAuthResponse(user);
+    }
+
     /** Acceso de invitado (solo lectura): emite un token VIEWER sin contraseña. */
     public AuthResponse loginAsGuest() {
         User guest = userRepository.findByEmail(GuestSeeder.GUEST_EMAIL)

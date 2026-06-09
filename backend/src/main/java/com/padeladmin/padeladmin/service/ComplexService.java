@@ -8,8 +8,10 @@ import com.padeladmin.padeladmin.entity.Complex;
 import com.padeladmin.padeladmin.entity.Court;
 import com.padeladmin.padeladmin.exception.BusinessException;
 import com.padeladmin.padeladmin.exception.ResourceNotFoundException;
+import com.padeladmin.padeladmin.repository.ClubRepository;
 import com.padeladmin.padeladmin.repository.ComplexRepository;
 import com.padeladmin.padeladmin.repository.CourtRepository;
+import com.padeladmin.padeladmin.security.TenantContext;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -23,9 +25,12 @@ public class ComplexService {
 
     private final ComplexRepository complexRepository;
     private final CourtRepository courtRepository;
+    private final TenantContext tenantContext;
+    private final ClubRepository clubRepository;
 
     public List<ComplexResponseDto> findAll() {
         return complexRepository.findAll().stream()
+                .filter(c -> tenantContext.canAccessClub(c.getClub() != null ? c.getClub().getId() : null))
                 .map(this::toDto)
                 .toList();
     }
@@ -41,6 +46,9 @@ public class ComplexService {
                 .address(dto.getAddress())
                 .phone(dto.getPhone())
                 .build();
+        // Los complejos creados por un usuario CLUB nacen dentro de su club.
+        tenantContext.restrictedClubId().ifPresent(clubId ->
+                complex.setClub(clubRepository.getReferenceById(clubId)));
         return toDto(complexRepository.save(complex));
     }
 

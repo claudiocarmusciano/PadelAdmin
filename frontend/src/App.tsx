@@ -11,6 +11,7 @@ import ClubsPage from '@/pages/ClubsPage'
 import SettingsPage from '@/pages/SettingsPage'
 import LoginPage from '@/pages/LoginPage'
 import RegisterPage from '@/pages/RegisterPage'
+import ChangePasswordPage from '@/pages/ChangePasswordPage'
 
 function App() {
   return (
@@ -19,6 +20,16 @@ function App() {
         {/* Públicas */}
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
+
+        {/* Cambio de contraseña (pantalla completa, sin Layout): primer ingreso obligatorio */}
+        <Route
+          path="/change-password"
+          element={
+            <ProtectedRoute>
+              <ChangePasswordPage />
+            </ProtectedRoute>
+          }
+        />
 
         {/* Protegidas (requieren login) */}
         <Route
@@ -37,7 +48,7 @@ function App() {
           <Route
             path="/clubs"
             element={
-              <ProtectedRoute requireAdmin>
+              <ProtectedRoute requireSuperAdmin>
                 <ClubsPage />
               </ProtectedRoute>
             }
@@ -45,7 +56,7 @@ function App() {
           <Route
             path="/settings"
             element={
-              <ProtectedRoute requireAdmin>
+              <ProtectedRoute requireSuperAdmin>
                 <SettingsPage />
               </ProtectedRoute>
             }

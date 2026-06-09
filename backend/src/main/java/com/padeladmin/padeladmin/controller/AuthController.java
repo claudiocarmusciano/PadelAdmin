@@ -39,6 +39,17 @@ public class AuthController {
         return ResponseEntity.ok(authService.loginAsGuest());
     }
 
+    /** Cambio de contraseña del usuario autenticado (incluye el cambio forzado del primer login). */
+    @PostMapping("/change-password")
+    public ResponseEntity<AuthResponse> changePassword(
+            @Valid @RequestBody com.padeladmin.padeladmin.dto.auth.ChangePasswordRequest request) {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !auth.isAuthenticated()) {
+            return ResponseEntity.status(401).build();
+        }
+        return ResponseEntity.ok(authService.changePassword(auth.getName(), request));
+    }
+
     @GetMapping("/me")
     public ResponseEntity<Map<String, Object>> me() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();

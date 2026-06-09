@@ -34,6 +34,15 @@ function NavItem({ to, label, icon: Icon, hideLabel = false }: { to: string; lab
   )
 }
 
+/** Etiqueta visible del rol del usuario. */
+function roleLabel(role: string): string {
+  switch (role) {
+    case 'ADMIN': return 'Admin'
+    case 'CLUB': return 'Club'
+    default: return 'Viewer'
+  }
+}
+
 function UserFooter({ hideLabels = false }: { hideLabels?: boolean }) {
   const { user, isAdmin, logout } = useAuth()
   if (!user) return null
@@ -53,7 +62,7 @@ function UserFooter({ hideLabels = false }: { hideLabels?: boolean }) {
       <div className="px-1 space-y-1">
         <p className="text-xs text-muted-foreground truncate" title={user.email}>{user.email}</p>
         <Badge variant={isAdmin ? 'default' : 'secondary'} className="text-[10px] uppercase">
-          {isAdmin ? 'Admin' : 'Viewer'}
+          {roleLabel(user.role)}
         </Badge>
       </div>
       <Button size="sm" variant="ghost" className="w-full justify-start text-muted-foreground" onClick={logout}>
@@ -65,7 +74,7 @@ function UserFooter({ hideLabels = false }: { hideLabels?: boolean }) {
 }
 
 function Sidebar({ hideLabels = false }: { hideLabels?: boolean }) {
-  const { isAdmin } = useAuth()
+  const { isSuperAdmin } = useAuth()
 
   return (
     <aside className={cn(
@@ -89,7 +98,7 @@ function Sidebar({ hideLabels = false }: { hideLabels?: boolean }) {
           <NavItem key={to} to={to} label={label} icon={icon} hideLabel={hideLabels} />
         ))}
       </nav>
-      {isAdmin && (
+      {isSuperAdmin && (
         <div className={cn(
           'p-3 border-t space-y-1',
           hideLabels && 'items-center flex flex-col'
@@ -110,7 +119,7 @@ function Sidebar({ hideLabels = false }: { hideLabels?: boolean }) {
 
 export default function Layout() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
-  const { user, isAdmin, logout } = useAuth()
+  const { user, isAdmin, isSuperAdmin, logout } = useAuth()
 
   return (
     <div className="flex h-screen bg-background">
@@ -158,7 +167,7 @@ export default function Layout() {
                   </div>
                 ))}
               </nav>
-              {isAdmin && (
+              {isSuperAdmin && (
                 <div className="p-3 border-t space-y-1">
                   <p className="px-3 pb-1 text-[10px] uppercase tracking-widest text-muted-foreground/60 font-semibold">
                     Admin
@@ -176,7 +185,7 @@ export default function Layout() {
                   <div className="px-1 space-y-1">
                     <p className="text-xs text-muted-foreground truncate">{user.email}</p>
                     <Badge variant={isAdmin ? 'default' : 'secondary'} className="text-[10px] uppercase">
-                      {isAdmin ? 'Admin' : 'Viewer'}
+                      {roleLabel(user.role)}
                     </Badge>
                   </div>
                   <Button
