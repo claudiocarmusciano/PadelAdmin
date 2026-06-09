@@ -13,4 +13,6 @@ public class AuthResponse {
     private String email;
     private UserRole role;
     private Instant expiresAt;
+    private boolean mustChangePassword;  // true → forzar cambio de contraseña en el primer login
+    private Long clubId;                  // club al que pertenece (rol CLUB), null si no aplica
 }

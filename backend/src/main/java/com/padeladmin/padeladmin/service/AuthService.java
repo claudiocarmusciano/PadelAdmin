@@ -77,6 +77,8 @@ public class AuthService {
 
     private AuthResponse buildAuthResponse(User user) {
         String token = jwtService.generateToken(user);
-        return new AuthResponse(token, user.getEmail(), user.getRole(), jwtService.getExpiration(token));
+        Long clubId = user.getClub() != null ? user.getClub().getId() : null;
+        return new AuthResponse(token, user.getEmail(), user.getRole(), jwtService.getExpiration(token),
+                user.isMustChangePassword(), clubId);
     }
 }

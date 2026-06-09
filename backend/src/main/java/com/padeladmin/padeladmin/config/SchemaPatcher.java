@@ -36,8 +36,9 @@ public class SchemaPatcher implements CommandLineRunner {
     private void patchUsersRoleCheck() {
         try {
             jdbc.execute("ALTER TABLE users DROP CONSTRAINT IF EXISTS users_role_check");
-            jdbc.execute("ALTER TABLE users ADD CONSTRAINT users_role_check CHECK (role IN ('ADMIN', 'VIEWER'))");
-            log.info("✓ Constraint users_role_check actualizado: acepta ADMIN y VIEWER");
+            jdbc.execute("ALTER TABLE users ADD CONSTRAINT users_role_check " +
+                    "CHECK (role IN ('ADMIN', 'VIEWER', 'SUPER_ADMIN', 'CLUB', 'PLAYER'))");
+            log.info("✓ Constraint users_role_check actualizado: ADMIN, VIEWER, SUPER_ADMIN, CLUB, PLAYER");
         } catch (Exception ex) {
             // No frenamos el arranque si falla — logueamos para que sea visible.
             log.warn("No se pudo patchar users_role_check: {}", ex.getMessage());

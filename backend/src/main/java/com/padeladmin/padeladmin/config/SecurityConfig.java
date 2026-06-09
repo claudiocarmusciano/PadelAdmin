@@ -36,6 +36,8 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         // Endpoints públicos de autenticación
                         .requestMatchers("/api/auth/login", "/api/auth/register", "/api/auth/guest").permitAll()
+                        // Gestión de clubes: SOLO super-admin (hoy = rol ADMIN), todos los métodos.
+                        .requestMatchers("/api/clubs/**").hasRole("ADMIN")
                         // Lectura: cualquier usuario autenticado
                         .requestMatchers(HttpMethod.GET, "/api/**").authenticated()
                         // Escritura: solo ADMIN

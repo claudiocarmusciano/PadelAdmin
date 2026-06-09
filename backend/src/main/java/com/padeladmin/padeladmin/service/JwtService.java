@@ -31,10 +31,14 @@ public class JwtService {
     public String generateToken(User user) {
         Instant now = Instant.now();
         Instant exp = now.plus(ttlHours, ChronoUnit.HOURS);
-        return Jwts.builder()
+        var builder = Jwts.builder()
                 .subject(user.getEmail())
                 .claim("role", user.getRole().name())
-                .claim("userId", user.getId())
+                .claim("userId", user.getId());
+        // Contexto multi-tenant: club (rol CLUB) o jugador (rol PLAYER).
+        if (user.getClub() != null) builder.claim("clubId", user.getClub().getId());
+        if (user.getPlayer() != null) builder.claim("playerId", user.getPlayer().getId());
+        return builder
                 .issuedAt(Date.from(now))
                 .expiration(Date.from(exp))
                 .signWith(key)
