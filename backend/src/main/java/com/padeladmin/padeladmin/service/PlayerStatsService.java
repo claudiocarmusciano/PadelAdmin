@@ -11,6 +11,7 @@ import com.padeladmin.padeladmin.repository.MatchRepository;
 import com.padeladmin.padeladmin.repository.MatchResultRepository;
 import com.padeladmin.padeladmin.repository.PairPlayerRepository;
 import com.padeladmin.padeladmin.repository.PlayerRepository;
+import com.padeladmin.padeladmin.security.TenantContext;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -31,13 +32,20 @@ public class PlayerStatsService {
     private final PairPlayerRepository pairPlayerRepository;
     private final MatchRepository matchRepository;
     private final MatchResultRepository matchResultRepository;
+    private final TenantContext tenantContext;
 
     public PlayerStatsDto computeStats(Long playerId) {
         Player player = playerRepository.findById(playerId)
                 .orElseThrow(() -> new ResourceNotFoundException("Jugador", playerId));
 
-        // 1. Todas las parejas en las que jugó (con su tournament)
-        List<PairPlayer> myPairPlayers = pairPlayerRepository.findByPlayerId(playerId);
+        // 1. Todas las parejas en las que jugó (con su tournament).
+        //    Multi-tenant: un usuario CLUB solo ve la historia del jugador en SUS torneos.
+        List<PairPlayer> myPairPlayers = pairPlayerRepository.findByPlayerId(playerId).stream()
+                .filter(pp -> {
+                    var club = pp.getPair().getTournament().getClub();
+                    return tenantContext.canAccessClub(club != null ? club.getId() : null);
+                })
+                .toList();
         if (myPairPlayers.isEmpty()) {
             return emptyStats(player);
         }

@@ -57,6 +57,7 @@ public class TenantIsolationInterceptor implements HandlerInterceptor {
         checkVar(vars, "courtId", clubId,
                 "SELECT cx.club_id FROM courts c JOIN complexes cx ON cx.id = c.complex_id WHERE c.id = ?",
                 "Cancha");
+        checkVar(vars, "categoryId", clubId, "SELECT club_id FROM categories WHERE id = ?", "Categoría");
 
         // Controllers que usan {id} genérico: se desambigua por prefijo de ruta.
         if (vars.containsKey("id")) {

@@ -14,6 +14,7 @@ import com.padeladmin.padeladmin.exception.ResourceNotFoundException;
 import com.padeladmin.padeladmin.repository.CategoryRepository;
 import com.padeladmin.padeladmin.repository.PlayerCategoryPointsRepository;
 import com.padeladmin.padeladmin.repository.PlayerRepository;
+import com.padeladmin.padeladmin.security.TenantContext;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -32,6 +33,15 @@ public class PlayerService {
     private final PlayerRepository playerRepository;
     private final PlayerCategoryPointsRepository categoryPointsRepository;
     private final CategoryRepository categoryRepository;
+    private final TenantContext tenantContext;
+
+    /**
+     * Los jugadores son compartidos entre clubes, pero sus categorías y puntos pertenecen al
+     * ranking de cada club: un usuario CLUB solo ve/edita las entradas de SUS categorías.
+     */
+    private boolean categoryVisible(Category category) {
+        return tenantContext.canAccessClub(category.getClub() != null ? category.getClub().getId() : null);
+    }
 
     public List<PlayerResponseDto> findAll() {
         return playerRepository.findAll().stream()
@@ -61,8 +71,11 @@ public class PlayerService {
      *                    Cuando no hay categoryId, el resultado se ordena por (lastName, firstName).
      */
     public List<PlayerWithCategoriesDto> findAllWithCategories(Long categoryId, String search) {
-        // 1. Traer todas las entradas de puntos en una sola query
-        List<PlayerCategoryPoints> allPoints = categoryPointsRepository.findAll();
+        // 1. Traer todas las entradas de puntos en una sola query.
+        //    Multi-tenant: solo las de categorías visibles para el usuario (rankings por club).
+        List<PlayerCategoryPoints> allPoints = categoryPointsRepository.findAll().stream()
+                .filter(p -> categoryVisible(p.getCategory()))
+                .toList();
 
         // 2. Calcular ranking por categoría — empates comparten posición (#3, #3, #5)
         Map<Long, Map<Long, Integer>> ranksByCategory = new HashMap<>();
@@ -190,6 +203,7 @@ public class PlayerService {
     public List<PlayerCategoryPointsResponseDto> getPoints(Long playerId) {
         getOrThrow(playerId);
         return categoryPointsRepository.findByPlayerId(playerId).stream()
+                .filter(p -> categoryVisible(p.getCategory()))
                 .map(this::toPointsDto)
                 .toList();
     }
@@ -199,6 +213,10 @@ public class PlayerService {
         Player player = getOrThrow(playerId);
         Category category = categoryRepository.findById(dto.getCategoryId())
                 .orElseThrow(() -> new ResourceNotFoundException("Categoría", dto.getCategoryId()));
+        // El categoryId viaja en el body (el interceptor no lo ve): validar acá la pertenencia.
+        if (!categoryVisible(category)) {
+            throw new ResourceNotFoundException("Categoría", dto.getCategoryId());
+        }
 
         // Si ya existe la entrada la actualiza, si no la crea (upsert)
         PlayerCategoryPoints entry = categoryPointsRepository
@@ -218,6 +236,9 @@ public class PlayerService {
                 .findByPlayerIdAndCategoryId(playerId, categoryId)
                 .orElseThrow(() -> new BusinessException(
                         "El jugador no tiene puntos registrados en esa categoría"));
+        if (!categoryVisible(entry.getCategory())) {
+            throw new ResourceNotFoundException("Categoría", categoryId);
+        }
         categoryPointsRepository.delete(entry);
     }
 
