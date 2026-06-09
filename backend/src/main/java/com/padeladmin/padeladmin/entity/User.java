@@ -39,7 +39,8 @@ public class User {
     private Player player;
 
     // true → obliga a cambiar la contraseña en el primer login (alta de club por el super-admin).
-    @Column(name = "must_change_password", nullable = false)
+    // columnDefinition con default: permite agregar la columna a tablas que ya tienen filas.
+    @Column(name = "must_change_password", nullable = false, columnDefinition = "boolean not null default false")
     @Builder.Default
     private boolean mustChangePassword = false;
 

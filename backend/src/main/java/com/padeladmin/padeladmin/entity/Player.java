@@ -38,7 +38,8 @@ public class Player {
     private String email;
 
     // true cuando el jugador seteó su contraseña y puede loguearse.
-    @Column(name = "account_activated", nullable = false)
+    // columnDefinition con default: permite agregar la columna a tablas que ya tienen filas.
+    @Column(name = "account_activated", nullable = false, columnDefinition = "boolean not null default false")
     @Builder.Default
     private boolean accountActivated = false;
 
