@@ -22,6 +22,11 @@ public class Tournament {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    // Tenant dueño (multi-tenancy). Nullable durante migración; se backfillea a "Club #1".
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "club_id")
+    private Club club;
+
     @Column(nullable = false, length = 150)
     private String name;
 

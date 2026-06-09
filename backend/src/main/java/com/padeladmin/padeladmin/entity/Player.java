@@ -29,6 +29,19 @@ public class Player {
     @Column(name = "last_name", nullable = false, length = 100)
     private String lastName;
 
+    // Identidad compartida entre clubes (multi-tenancy).
+    // DNI = clave única (obligatorio en altas nuevas; legacy nullable). Email = canal de activación/recuperación.
+    @Column(length = 20)
+    private String dni;
+
+    @Column(length = 255)
+    private String email;
+
+    // true cuando el jugador seteó su contraseña y puede loguearse.
+    @Column(name = "account_activated", nullable = false)
+    @Builder.Default
+    private boolean accountActivated = false;
+
     @Column(length = 30)
     private String phone;
 

@@ -29,6 +29,20 @@ public class User {
     @Column(nullable = false, length = 20)
     private UserRole role;
 
+    // Multi-tenancy: un usuario CLUB pertenece a un club; un usuario PLAYER, a un jugador.
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "club_id")
+    private Club club;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "player_id")
+    private Player player;
+
+    // true → obliga a cambiar la contraseña en el primer login (alta de club por el super-admin).
+    @Column(name = "must_change_password", nullable = false)
+    @Builder.Default
+    private boolean mustChangePassword = false;
+
     @Column(name = "is_active", nullable = false)
     @Builder.Default
     private boolean active = true;

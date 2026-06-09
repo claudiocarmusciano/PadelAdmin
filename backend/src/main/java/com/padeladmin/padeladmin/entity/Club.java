@@ -5,24 +5,22 @@ import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
 
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.List;
 
+/**
+ * Tenant del sistema: cada club gestiona SOLO sus propios datos (categorías, torneos,
+ * complejos/canchas, turnos, ranking). Lo único compartido entre clubes es el padrón
+ * global de jugadores (entidad Player, que NO tiene club).
+ */
 @Entity
-@Table(name = "complexes")
+@Table(name = "clubs")
 @Getter @Setter
 @NoArgsConstructor @AllArgsConstructor
 @Builder
-public class Complex {
+public class Club {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-
-    // Tenant dueño (multi-tenancy). Nullable durante la migración; se backfillea a "Club #1".
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "club_id")
-    private Club club;
 
     @Column(nullable = false, length = 150)
     private String name;
@@ -33,11 +31,11 @@ public class Complex {
     @Column(length = 30)
     private String phone;
 
+    @Column(name = "is_active", nullable = false)
+    @Builder.Default
+    private boolean active = true;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
-
-    @OneToMany(mappedBy = "complex", cascade = CascadeType.ALL, orphanRemoval = true)
-    @Builder.Default
-    private List<Court> courts = new ArrayList<>();
 }

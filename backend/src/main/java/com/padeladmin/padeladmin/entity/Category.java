@@ -14,7 +14,13 @@ public class Category {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false, unique = true, length = 50)
+    // Tenant dueño. Nullable durante migración; se backfillea a "Club #1".
+    // Las categorías son POR CLUB (la unicidad del nombre pasa a ser por club, no global).
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "club_id")
+    private Club club;
+
+    @Column(nullable = false, length = 50)
     private String name;
 
     @Column(length = 255)
