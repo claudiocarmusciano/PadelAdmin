@@ -8,7 +8,8 @@ export interface Club {
   active: boolean
   createdAt: string
   adminEmail?: string | null
-  generatedPassword?: string | null  // solo al crear
+  generatedPassword?: string | null  // solo al crear y si NO se pudo enviar por email
+  emailSent?: boolean                // true = la contraseña se mandó al email del club
 }
 
 export interface ClubRequest {

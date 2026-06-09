@@ -15,7 +15,7 @@ public class ClubResponseDto {
     private boolean active;
     private LocalDateTime createdAt;
     private String adminEmail;          // email del usuario CLUB
-    // Solo se devuelve al CREAR el club (la contraseña generada para pasarle al club).
-    // En el listado va null.
+    // Solo se devuelve al CREAR el club Y si NO se pudo enviar por email (fallback).
     private String generatedPassword;
+    private boolean emailSent;          // true = la contraseña se mandó al email del club
 }

@@ -28,6 +28,7 @@ public class ClubService {
     private final ClubRepository clubRepository;
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final EmailService emailService;
 
     private static final SecureRandom RANDOM = new SecureRandom();
     private static final String PWD_CHARS = "abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -61,9 +62,14 @@ public class ClubService {
                 .build();
         userRepository.save(clubUser);
 
+        // Enviar la contraseña inicial por email. Si el mail está desactivado o falla,
+        // se devuelve la contraseña en la respuesta como fallback (para no quedar trabados).
+        boolean sent = emailService.sendClubWelcome(email, club.getName(), plainPassword, null);
+
         ClubResponseDto resp = toDto(club);
         resp.setAdminEmail(email);
-        resp.setGeneratedPassword(plainPassword); // se devuelve SOLO al crear
+        resp.setEmailSent(sent);
+        resp.setGeneratedPassword(sent ? null : plainPassword);
         return resp;
     }
 

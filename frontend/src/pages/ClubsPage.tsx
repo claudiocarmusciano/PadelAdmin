@@ -119,22 +119,35 @@ export default function ClubsPage() {
           </DialogHeader>
           {created && (
             <div className="space-y-3 py-2">
-              <p className="text-sm">Pasale estas credenciales al club. <strong>Anotalas ahora</strong>: la contraseña no se vuelve a mostrar.</p>
-              <div className="rounded-md border bg-muted/40 p-3 space-y-2 text-sm">
-                <div className="flex justify-between gap-2"><span className="text-muted-foreground">Club</span><span className="font-medium">{created.name}</span></div>
-                <div className="flex justify-between gap-2"><span className="text-muted-foreground">Email</span><span className="font-mono">{created.adminEmail}</span></div>
-                <div className="flex justify-between gap-2 items-center">
-                  <span className="text-muted-foreground">Contraseña</span>
-                  <span className="flex items-center gap-2">
-                    <span className="font-mono font-semibold tracking-wider">{created.generatedPassword}</span>
-                    <button
-                      type="button"
-                      onClick={() => { navigator.clipboard?.writeText(created.generatedPassword ?? ''); toast.success('Contraseña copiada') }}
-                      className="text-muted-foreground hover:text-foreground" title="Copiar"
-                    ><Copy size={14} /></button>
-                  </span>
-                </div>
-              </div>
+              {created.emailSent ? (
+                <>
+                  <p className="text-sm">✅ Se enviaron las credenciales al email del club. La contraseña inicial llegó a su correo y la cambiará en el primer ingreso.</p>
+                  <div className="rounded-md border bg-muted/40 p-3 space-y-2 text-sm">
+                    <div className="flex justify-between gap-2"><span className="text-muted-foreground">Club</span><span className="font-medium">{created.name}</span></div>
+                    <div className="flex justify-between gap-2"><span className="text-muted-foreground">Email</span><span className="font-mono">{created.adminEmail}</span></div>
+                    <div className="flex justify-between gap-2"><span className="text-muted-foreground">Contraseña</span><span className="italic text-muted-foreground">enviada por email</span></div>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <p className="text-sm text-amber-500">No se pudo enviar el email (mail no configurado o falló). Pasale estas credenciales al club manualmente. <strong>Anotalas ahora</strong>: no se vuelven a mostrar.</p>
+                  <div className="rounded-md border bg-muted/40 p-3 space-y-2 text-sm">
+                    <div className="flex justify-between gap-2"><span className="text-muted-foreground">Club</span><span className="font-medium">{created.name}</span></div>
+                    <div className="flex justify-between gap-2"><span className="text-muted-foreground">Email</span><span className="font-mono">{created.adminEmail}</span></div>
+                    <div className="flex justify-between gap-2 items-center">
+                      <span className="text-muted-foreground">Contraseña</span>
+                      <span className="flex items-center gap-2">
+                        <span className="font-mono font-semibold tracking-wider">{created.generatedPassword}</span>
+                        <button
+                          type="button"
+                          onClick={() => { navigator.clipboard?.writeText(created.generatedPassword ?? ''); toast.success('Contraseña copiada') }}
+                          className="text-muted-foreground hover:text-foreground" title="Copiar"
+                        ><Copy size={14} /></button>
+                      </span>
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
           )}
           <DialogFooter>
