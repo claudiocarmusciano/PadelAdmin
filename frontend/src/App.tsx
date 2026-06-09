@@ -7,6 +7,7 @@ import TournamentDetailPage from '@/pages/TournamentDetailPage'
 import PlayersPage from '@/pages/PlayersPage'
 import CategoriesPage from '@/pages/CategoriesPage'
 import ComplexesPage from '@/pages/ComplexesPage'
+import ClubsPage from '@/pages/ClubsPage'
 import SettingsPage from '@/pages/SettingsPage'
 import LoginPage from '@/pages/LoginPage'
 import RegisterPage from '@/pages/RegisterPage'
@@ -33,6 +34,14 @@ function App() {
           <Route path="/players" element={<PlayersPage />} />
           <Route path="/categories" element={<CategoriesPage />} />
           <Route path="/complexes" element={<ComplexesPage />} />
+          <Route
+            path="/clubs"
+            element={
+              <ProtectedRoute requireAdmin>
+                <ClubsPage />
+              </ProtectedRoute>
+            }
+          />
           <Route
             path="/settings"
             element={

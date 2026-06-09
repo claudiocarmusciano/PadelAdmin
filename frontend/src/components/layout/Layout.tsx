@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Outlet, NavLink } from 'react-router-dom'
-import { Trophy, Users, Tag, Building2, Settings, Menu, X, LogOut } from 'lucide-react'
+import { Trophy, Users, Tag, Building2, Settings, Menu, X, LogOut, Landmark } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import PadelAdminLogo from '@/components/logo/PadelAdminLogo'
 import { Button } from '@/components/ui/button'
@@ -99,6 +99,7 @@ function Sidebar({ hideLabels = false }: { hideLabels?: boolean }) {
               Admin
             </p>
           )}
+          <NavItem to="/clubs" label="Clubes" icon={Landmark} hideLabel={hideLabels} />
           <NavItem to="/settings" label="Configuración" icon={Settings} hideLabel={hideLabels} />
         </div>
       )}
@@ -162,6 +163,9 @@ export default function Layout() {
                   <p className="px-3 pb-1 text-[10px] uppercase tracking-widest text-muted-foreground/60 font-semibold">
                     Admin
                   </p>
+                  <div onClick={() => setMobileMenuOpen(false)}>
+                    <NavItem to="/clubs" label="Clubes" icon={Landmark} hideLabel={false} />
+                  </div>
                   <div onClick={() => setMobileMenuOpen(false)}>
                     <NavItem to="/settings" label="Configuración" icon={Settings} hideLabel={false} />
                   </div>
