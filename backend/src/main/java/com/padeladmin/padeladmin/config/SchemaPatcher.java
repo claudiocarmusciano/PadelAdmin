@@ -30,6 +30,35 @@ public class SchemaPatcher implements CommandLineRunner {
     @Override
     public void run(String... args) {
         patchUsersRoleCheck();
+        dropCategoriesGlobalNameUnique();
+    }
+
+    /**
+     * Multi-tenant: las categorías dejaron de ser únicas por nombre global (cada club tiene
+     * las suyas, p.ej. dos clubes con "7ma. Caballeros"). La entidad ya no declara unique=true,
+     * pero ddl-auto=update no borra el constraint viejo: lo buscamos por definición (UNIQUE
+     * sobre la columna name) y lo borramos. La unicidad por club la valida CategoryService.
+     */
+    private void dropCategoriesGlobalNameUnique() {
+        try {
+            var names = jdbc.queryForList("""
+                    SELECT con.conname
+                    FROM pg_constraint con
+                    JOIN pg_class rel ON rel.oid = con.conrelid
+                    WHERE rel.relname = 'categories'
+                      AND con.contype = 'u'
+                      AND (SELECT array_agg(att.attname)
+                           FROM unnest(con.conkey) k
+                           JOIN pg_attribute att ON att.attrelid = rel.oid AND att.attnum = k
+                          ) = ARRAY['name']::name[]
+                    """, String.class);
+            for (String name : names) {
+                jdbc.execute("ALTER TABLE categories DROP CONSTRAINT IF EXISTS \"" + name + "\"");
+                log.info("✓ Constraint único global de categories.name eliminado: {}", name);
+            }
+        } catch (Exception ex) {
+            log.warn("No se pudo patchar el unique de categories.name: {}", ex.getMessage());
+        }
     }
 
     /** Drop + recreate del constraint users.role para que acepte ADMIN y VIEWER. */
