@@ -18,7 +18,7 @@ const defaultForm: CategoryForm = { name: '', description: '' }
 
 export default function CategoriesPage() {
   const qc = useQueryClient()
-  const { isAdmin } = useAuth()
+  const { isAdmin, isSuperAdmin } = useAuth()
   const [open, setOpen] = useState(false)
   const [editing, setEditing] = useState<Category | null>(null)
   const [form, setForm] = useState<CategoryForm>(defaultForm)
@@ -123,7 +123,12 @@ export default function CategoriesPage() {
             <Card key={c.id}>
               <CardContent className="flex items-center gap-3 py-3">
                 <div className="flex-1">
-                  <p className="font-medium text-sm">{c.name}</p>
+                  <p className="font-medium text-sm">
+                    {c.name}
+                    {isSuperAdmin && c.clubName && (
+                      <span className="ml-2 text-xs font-normal text-muted-foreground">· {c.clubName}</span>
+                    )}
+                  </p>
                   {c.description && (
                     <p className="text-xs text-muted-foreground">{c.description}</p>
                   )}

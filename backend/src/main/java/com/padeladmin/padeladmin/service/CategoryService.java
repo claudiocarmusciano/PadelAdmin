@@ -87,6 +87,7 @@ public class CategoryService {
                 .id(category.getId())
                 .name(category.getName())
                 .description(category.getDescription())
+                .clubName(category.getClub() != null ? category.getClub().getName() : null)
                 .build();
     }
 }

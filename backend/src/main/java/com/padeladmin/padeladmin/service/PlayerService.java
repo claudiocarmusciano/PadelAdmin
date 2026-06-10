@@ -128,6 +128,7 @@ public class PlayerService {
                     .map(pp -> PlayerCategoryRankDto.builder()
                             .categoryId(pp.getCategory().getId())
                             .categoryName(pp.getCategory().getName())
+                            .clubName(clubNameOf(pp.getCategory()))
                             .points(pp.getPoints())
                             .rank(ranksByCategory.get(pp.getCategory().getId()).get(player.getId()))
                             .totalInCategory(totalByCategory.get(pp.getCategory().getId()))
@@ -261,8 +262,13 @@ public class PlayerService {
                 .playerName(p.getPlayer().getLastName() + ", " + p.getPlayer().getFirstName())
                 .categoryId(p.getCategory().getId())
                 .categoryName(p.getCategory().getName())
+                .clubName(clubNameOf(p.getCategory()))
                 .points(p.getPoints())
                 .build();
+    }
+
+    private String clubNameOf(Category category) {
+        return category.getClub() != null ? category.getClub().getName() : null;
     }
 
     private PlayerResponseDto toDto(Player player) {

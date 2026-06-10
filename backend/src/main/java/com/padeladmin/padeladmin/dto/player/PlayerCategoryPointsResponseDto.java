@@ -11,5 +11,7 @@ public class PlayerCategoryPointsResponseDto {
     private String playerName;
     private Long categoryId;
     private String categoryName;
+    /** Club dueño de la categoría/ranking (null = categoría global, anterior al multi-tenant). */
+    private String clubName;
     private Double points;
 }

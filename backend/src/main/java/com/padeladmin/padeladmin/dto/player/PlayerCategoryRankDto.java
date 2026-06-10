@@ -13,6 +13,8 @@ import lombok.NoArgsConstructor;
 public class PlayerCategoryRankDto {
     private Long categoryId;
     private String categoryName;
+    /** Club dueño de la categoría/ranking (null = categoría global, anterior al multi-tenant). */
+    private String clubName;
     private Double points;
     /** Posición #N dentro de la categoría (1 = mejor). Empates comparten posición. */
     private Integer rank;

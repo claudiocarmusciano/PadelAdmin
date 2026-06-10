@@ -26,7 +26,7 @@ const defaultForm: PlayerRequest = {
 // ── Sección de categorías/puntos por jugador ───────────────────────────────
 function PlayerCategoriesSection({ player }: { player: { id: number; firstName: string; lastName: string } }) {
   const qc = useQueryClient()
-  const { isAdmin } = useAuth()
+  const { isAdmin, isSuperAdmin } = useAuth()
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingCatId, setEditingCatId] = useState<number | null>(null) // null = modo agregar
   const [selectedCategoryId, setSelectedCategoryId] = useState('')
@@ -128,7 +128,12 @@ function PlayerCategoriesSection({ player }: { player: { id: number; firstName: 
               key={pp.categoryId}
               className="flex items-center gap-1.5 bg-secondary rounded-md pl-2.5 pr-1 py-1"
             >
-              <span className="text-xs font-medium">{pp.categoryName}</span>
+              <span className="text-xs font-medium">
+                {pp.categoryName}
+                {isSuperAdmin && pp.clubName && (
+                  <span className="text-muted-foreground font-normal"> · {pp.clubName}</span>
+                )}
+              </span>
               <Badge variant="outline" className="text-xs h-5 px-1.5">
                 {pp.points} pts
               </Badge>
@@ -180,7 +185,9 @@ function PlayerCategoriesSection({ player }: { player: { id: number; firstName: 
                   </SelectTrigger>
                   <SelectContent>
                     {availableCategories.map((c) => (
-                      <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>
+                      <SelectItem key={c.id} value={String(c.id)}>
+                        {c.name}{isSuperAdmin && c.clubName ? ` · ${c.clubName}` : ''}
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -224,7 +231,7 @@ function PlayerRow({
   onDelete: (p: PlayerWithCategories) => void
   onStats: (p: PlayerWithCategories) => void
 }) {
-  const { isAdmin } = useAuth()
+  const { isAdmin, isSuperAdmin } = useAuth()
   const [expanded, setExpanded] = useState(false)
 
   const hasFilter = highlightCategoryId !== undefined
@@ -249,9 +256,10 @@ function PlayerRow({
                         'text-xs h-5 px-1.5 ' +
                         (isInactive ? 'bg-primary/15 text-foreground border-primary/30' : '')
                       }
-                      title={`Posición ${c.rank} de ${c.totalInCategory} en ${c.categoryName}`}
+                      title={`Posición ${c.rank} de ${c.totalInCategory} en ${c.categoryName}${c.clubName ? ` (${c.clubName})` : ''}`}
                     >
-                      {c.categoryName} · {c.points} pts · #{c.rank}
+                      {c.categoryName}
+                      {isSuperAdmin && c.clubName ? ` (${c.clubName})` : ''} · {c.points} pts · #{c.rank}
                     </Badge>
                   )
                 })}
@@ -304,7 +312,7 @@ function PlayerRow({
 // ── Página principal ───────────────────────────────────────────────────────
 export default function PlayersPage() {
   const qc = useQueryClient()
-  const { isAdmin } = useAuth()
+  const { isAdmin, isSuperAdmin } = useAuth()
   const [search, setSearch] = useState('')
   const [categoryFilter, setCategoryFilter] = useState<string>('') // '' = todas
   const [sortBy, setSortBy] = useState<'alpha' | 'rank'>('alpha')
@@ -454,7 +462,9 @@ export default function PlayersPage() {
           <SelectContent>
             <SelectItem value="all">Todas las categorías</SelectItem>
             {categories.map((c) => (
-              <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>
+              <SelectItem key={c.id} value={String(c.id)}>
+                {c.name}{isSuperAdmin && c.clubName ? ` · ${c.clubName}` : ''}
+              </SelectItem>
             ))}
           </SelectContent>
         </Select>

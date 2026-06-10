@@ -54,6 +54,8 @@ export interface PlayerCategoryPoints {
   playerName: string
   categoryId: number
   categoryName: string
+  /** Club dueño de la categoría/ranking (null = global, anterior al multi-tenant). */
+  clubName?: string | null
   points: number
 }
 
@@ -61,6 +63,8 @@ export interface PlayerCategoryPoints {
 export interface PlayerCategoryRank {
   categoryId: number
   categoryName: string
+  /** Club dueño de la categoría/ranking (null = global, anterior al multi-tenant). */
+  clubName?: string | null
   points: number
   /** Posición #N dentro de la categoría (1 = mejor). Empates comparten posición. */
   rank: number
@@ -136,6 +140,8 @@ export interface Category {
   id: number
   name: string
   description?: string
+  /** Club dueño de la categoría (null = global, anterior al multi-tenant). */
+  clubName?: string | null
 }
 
 // ── Complejos y Canchas ───────────────────────────────────────────────────────
