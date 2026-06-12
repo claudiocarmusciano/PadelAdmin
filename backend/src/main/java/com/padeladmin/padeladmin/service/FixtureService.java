@@ -8,6 +8,7 @@ import com.padeladmin.padeladmin.dto.fixture.ReorganizeResultDto;
 import com.padeladmin.padeladmin.entity.*;
 import com.padeladmin.padeladmin.enums.ConstraintType;
 import com.padeladmin.padeladmin.enums.MatchPhase;
+import com.padeladmin.padeladmin.enums.ZoneRound2Type;
 import com.padeladmin.padeladmin.enums.MatchStatus;
 import com.padeladmin.padeladmin.exception.BusinessException;
 import com.padeladmin.padeladmin.exception.ResourceNotFoundException;
@@ -156,14 +157,24 @@ public class FixtureService {
             matches.add(buildMatch(tournament, zone, pairAt(zonePairs, 2), pairAt(zonePairs, 3)));
         } else {
             // 4 parejas: 1°vs4°, 2°vs3° (ronda 1)
-            // Los partidos de ronda 2 (ganador vs ganador, perdedor vs perdedor)
-            // se crean automáticamente al registrar los resultados de ronda 1
             Match m1 = buildMatch(tournament, zone, pairAt(zonePairs, 1), pairAt(zonePairs, 4));
             m1.setZoneRound(1);
             Match m2 = buildMatch(tournament, zone, pairAt(zonePairs, 2), pairAt(zonePairs, 3));
             m2.setZoneRound(1);
             matches.add(m1);
             matches.add(m2);
+
+            // Ronda 2 como placeholders SIN parejas ("Ganador vs Ganador" / "Perdedor vs Perdedor"):
+            // se programan desde el inicio (ambos en el MISMO horario, canchas distintas) y las
+            // parejas se rellenan al cerrarse la Ronda 1 (MatchResultService.tryCreateRound2).
+            Match winners = buildMatch(tournament, zone, null, null);
+            winners.setZoneRound(2);
+            winners.setZoneRound2Type(ZoneRound2Type.WINNERS);
+            Match losers = buildMatch(tournament, zone, null, null);
+            losers.setZoneRound(2);
+            losers.setZoneRound2Type(ZoneRound2Type.LOSERS);
+            matches.add(winners);
+            matches.add(losers);
         }
 
         return matches;
@@ -284,43 +295,116 @@ public class FixtureService {
         // Partidos ya programados/jugados actúan como restricciones de ocupación
         List<Match> scheduled = new ArrayList<>(alreadyScheduled);
 
-        // Ordenar partidos por "restrictedness": los con menos slots compatibles primero.
+        // Parejas "efectivas" de cada partido: las reales, o las 4 de la zona para los
+        // placeholders de Ronda 2 (no se sabe quién juega cuál, pero las 4 juegan a esa hora).
+        Map<Match, List<Long>> pairsOf = buildEffectivePairs(matches);
+
+        // Unidades de programación: los 2 partidos de Ronda 2 de una zona de 4 van VINCULADOS
+        // (mismo día y hora, canchas distintas); el resto se programa individualmente.
+        List<List<Match>> units = buildUnits(matches);
+
+        // Ordenar por "restrictedness": los con menos slots compatibles primero.
         // Así los más restringidos toman los pocos slots que pueden usar antes que partidos
         // flexibles "se coman" esos slots y los obliguen a violar preferencias.
-        List<Match> ordered = new ArrayList<>(matches);
-        ordered.sort(Comparator.comparingInt(
-                m -> countCompatibleSlots(m, slots, constraintsByPairId)
+        units.sort(Comparator.comparingInt(
+                u -> countCompatibleSlots(u.get(0), slots, constraintsByPairId, pairsOf.get(u.get(0)))
         ));
 
         // Log del orden y restrictedness — útil para debug
         log.info("📋 Orden de procesamiento (más restringidos primero):");
-        for (Match m : ordered) {
-            int compat = countCompatibleSlots(m, slots, constraintsByPairId);
-            Long p1 = m.getPair1().getId();
-            Long p2 = m.getPair2() != null ? m.getPair2().getId() : null;
-            log.info("   • pareja {} vs pareja {} → {} slots compatibles", p1, p2, compat);
+        for (List<Match> u : units) {
+            int compat = countCompatibleSlots(u.get(0), slots, constraintsByPairId, pairsOf.get(u.get(0)));
+            log.info("   • {} → {} slots compatibles", unitLabel(u), compat);
         }
 
         // ── 1) BACKTRACKING: buscar una asignación COMPLETA (0 pendientes) ──
         // Las hard constraints son obligatorias; las preferencias se usan como heurística de
         // orden (se prueban primero los slots que las respetan). Tope de tiempo para no colgar.
         long deadline = System.nanoTime() + BACKTRACK_BUDGET_NANOS;
-        boolean solved = backtrack(ordered, 0, slots, courtMap, tournament, constraintsByPairId, scheduled, deadline);
+        boolean solved = backtrack(units, 0, slots, courtMap, tournament, constraintsByPairId, pairsOf, scheduled, deadline);
         if (solved) {
-            log.info("Scheduling (backtracking): solución COMPLETA — 0 pendientes ({} partidos)", ordered.size());
+            log.info("Scheduling (backtracking): solución COMPLETA — 0 pendientes ({} partidos)", matches.size());
             return;
         }
 
         // ── 2) Sin solución completa (o se agotó el tiempo) → greedy best-effort ──
         log.info("Scheduling: el backtracking no halló solución completa; uso greedy (programa lo que pueda)");
-        for (Match m : ordered) {
-            m.setStatus(MatchStatus.PENDING);
-            m.setScheduledStart(null);
-            m.setScheduledEnd(null);
-            m.setCourt(null);
+        for (List<Match> u : units) {
+            for (Match m : u) {
+                m.setStatus(MatchStatus.PENDING);
+                m.setScheduledStart(null);
+                m.setScheduledEnd(null);
+                m.setCourt(null);
+            }
         }
-        greedySchedule(ordered, slots, courtMap, tournament, constraintsByPairId,
+        greedySchedule(units, slots, courtMap, tournament, constraintsByPairId, pairsOf,
                 new ArrayList<>(alreadyScheduled));
+    }
+
+    /** Agrupa los partidos de Ronda 2 de cada zona de 4 como unidad vinculada (mismo horario). */
+    private List<List<Match>> buildUnits(List<Match> matches) {
+        Map<Long, List<Match>> round2ByZone = new LinkedHashMap<>();
+        List<List<Match>> units = new ArrayList<>();
+        for (Match m : matches) {
+            boolean linkedRound2 = m.getPhase() == MatchPhase.ZONE
+                    && Integer.valueOf(2).equals(m.getZoneRound())
+                    && m.getZoneRound2Type() != null
+                    && m.getZone() != null;
+            if (linkedRound2) {
+                round2ByZone.computeIfAbsent(m.getZone().getId(), k -> new ArrayList<>()).add(m);
+            } else {
+                units.add(new ArrayList<>(List.of(m)));
+            }
+        }
+        for (List<Match> twins : round2ByZone.values()) {
+            // WINNERS primero, para que el label/orden sea estable
+            twins.sort(Comparator.comparing(m -> m.getZoneRound2Type().ordinal()));
+            units.add(twins);
+        }
+        return units;
+    }
+
+    /** Parejas efectivas por partido (las 4 de la zona para placeholders de R2 sin parejas). */
+    private Map<Match, List<Long>> buildEffectivePairs(List<Match> matches) {
+        Map<Match, List<Long>> map = new IdentityHashMap<>();
+        Map<Long, List<Long>> zoneCache = new HashMap<>();
+        for (Match m : matches) {
+            map.put(m, computeEffectivePairIds(m, zoneCache));
+        }
+        return map;
+    }
+
+    private List<Long> computeEffectivePairIds(Match m, Map<Long, List<Long>> zoneCache) {
+        if (m.getPair1() != null) {
+            List<Long> ids = new ArrayList<>();
+            ids.add(m.getPair1().getId());
+            if (m.getPair2() != null) ids.add(m.getPair2().getId());
+            return ids;
+        }
+        if (m.getZone() != null) {
+            return zoneCache.computeIfAbsent(m.getZone().getId(), zid ->
+                    zonePairRepository.findByZoneIdOrderByPosition(zid).stream()
+                            .map(zp -> zp.getPair().getId())
+                            .toList());
+        }
+        return List.of();
+    }
+
+    /** Parejas efectivas de un partido suelto (operaciones manuales: mover, placements). */
+    private List<Long> effectivePairIds(Match m) {
+        return computeEffectivePairIds(m, new HashMap<>());
+    }
+
+    private String unitLabel(List<Match> unit) {
+        if (unit.size() == 2) {
+            String zone = unit.get(0).getZone() != null ? unit.get(0).getZone().getName() : "?";
+            return "Zona " + zone + " R2 (Gan+Perd, simultáneos)";
+        }
+        Match m = unit.get(0);
+        String p1 = m.getPair1() != null ? "pareja " + m.getPair1().getId()
+                : (m.getZoneRound2Type() != null ? m.getZoneRound2Type().name() : "?");
+        String p2 = m.getPair2() != null ? "pareja " + m.getPair2().getId() : "—";
+        return p1 + " vs " + p2;
     }
 
     /** Presupuesto de tiempo del backtracking antes de caer al greedy. */
@@ -328,47 +412,49 @@ public class FixtureService {
 
     /**
      * Backtracking con la ordenación MRV ya aplicada (más restringidos primero) y forward-checking.
-     * Intenta asignar TODOS los partidos a un slot válido (solo hard constraints), probando primero
-     * los slots que respetan las preferencias. Devuelve true si logró una asignación completa; si no
-     * (o si se agota el deadline), revierte todo y devuelve false.
+     * Opera sobre UNIDADES: un partido suelto, o los 2 de Ronda 2 de una zona de 4 (vinculados:
+     * mismo día y hora, canchas distintas). Solo hard constraints son obligatorias; los slots que
+     * respetan preferencias se prueban primero. Devuelve true si logró asignación completa.
      */
-    private boolean backtrack(List<Match> ordered, int idx, List<TimeSlot> slots,
+    private boolean backtrack(List<List<Match>> units, int idx, List<TimeSlot> slots,
                               Map<Long, Court> courtMap, Tournament tournament,
                               Map<Long, List<PairScheduleConstraint>> cons,
+                              Map<Match, List<Long>> pairsOf,
                               List<Match> scheduled, long deadline) {
-        if (idx == ordered.size()) return true;
+        if (idx == units.size()) return true;
         if (System.nanoTime() > deadline) return false;
 
-        Match match = ordered.get(idx);
-        boolean hasPrefs = hasAnyPreference(match, cons);
+        List<Match> unit = units.get(idx);
+        Match rep = unit.get(0);
+        List<Long> repPairs = pairsOf.get(rep);
+        boolean hasPrefs = hasAnyPreference(rep, cons, repPairs);
 
         // Candidatos válidos por hard constraints; los que cumplen preferencias van primero
         List<TimeSlot> preferred = new ArrayList<>();
         List<TimeSlot> others = new ArrayList<>();
         for (TimeSlot slot : slots) {
-            if (!isValidSlot(match, slot, scheduled, tournament, cons, false)) continue;
-            if (hasPrefs && isValidSlot(match, slot, scheduled, tournament, cons, true)) preferred.add(slot);
+            if (!isValidSlot(rep, slot, scheduled, tournament, cons, false, repPairs)) continue;
+            if (hasPrefs && isValidSlot(rep, slot, scheduled, tournament, cons, true, repPairs)) preferred.add(slot);
             else others.add(slot);
         }
 
         for (List<TimeSlot> bucket : List.of(preferred, others)) {
             for (TimeSlot slot : bucket) {
-                match.setScheduledStart(LocalDateTime.of(slot.getDate(), slot.getStartTime()));
-                match.setScheduledEnd(LocalDateTime.of(slot.getDate(), slot.getEndTime()));
-                match.setCourt(courtMap.get(slot.getCourtId()));
-                match.setStatus(MatchStatus.SCHEDULED);
-                scheduled.add(match);
+                List<Match> placed = placeUnit(unit, slot, slots, courtMap, tournament, cons, pairsOf, scheduled);
+                if (placed == null) continue; // (twin sin segunda cancha libre en ese horario)
 
-                if (backtrack(ordered, idx + 1, slots, courtMap, tournament, cons, scheduled, deadline)) {
+                if (backtrack(units, idx + 1, slots, courtMap, tournament, cons, pairsOf, scheduled, deadline)) {
                     return true;
                 }
 
                 // revertir
-                scheduled.remove(scheduled.size() - 1);
-                match.setScheduledStart(null);
-                match.setScheduledEnd(null);
-                match.setCourt(null);
-                match.setStatus(MatchStatus.PENDING);
+                for (Match m : placed) {
+                    scheduled.remove(m);
+                    m.setScheduledStart(null);
+                    m.setScheduledEnd(null);
+                    m.setCourt(null);
+                    m.setStatus(MatchStatus.PENDING);
+                }
 
                 if (System.nanoTime() > deadline) return false;
             }
@@ -376,65 +462,98 @@ public class FixtureService {
         return false;
     }
 
-    /** Greedy best-effort (fallback): a cada partido le asigna el primer slot válido, sin deshacer. */
-    private void greedySchedule(List<Match> ordered, List<TimeSlot> slots, Map<Long, Court> courtMap,
+    /**
+     * Coloca la unidad tomando `slot` para el primer partido. Si la unidad es un twin de Ronda 2,
+     * busca una SEGUNDA cancha libre en el mismo día y hora para el otro partido; si no hay,
+     * devuelve null sin tocar nada. Devuelve los partidos colocados (para poder revertir).
+     */
+    private List<Match> placeUnit(List<Match> unit, TimeSlot slot, List<TimeSlot> allSlots,
+                                  Map<Long, Court> courtMap, Tournament tournament,
+                                  Map<Long, List<PairScheduleConstraint>> cons,
+                                  Map<Match, List<Long>> pairsOf, List<Match> scheduled) {
+        Match first = unit.get(0);
+        assignSlot(first, slot, courtMap);
+        scheduled.add(first);
+        if (unit.size() == 1) return List.of(first);
+
+        // Twin: mismo día+hora, otra cancha. Se valida contra `scheduled` SIN el twin recién
+        // colocado (comparten parejas efectivas: chocarían por concurrencia/intervalo), pero
+        // la ocupación de SU cancha se excluye exigiendo cancha distinta.
+        Match second = unit.get(1);
+        List<Match> withoutFirst = new ArrayList<>(scheduled);
+        withoutFirst.remove(first);
+        for (TimeSlot s2 : allSlots) {
+            if (!s2.getDate().equals(slot.getDate())) continue;
+            if (!s2.getStartTime().equals(slot.getStartTime())) continue;
+            if (s2.getCourtId().equals(slot.getCourtId())) continue;
+            if (!isValidSlot(second, s2, withoutFirst, tournament, cons, false, pairsOf.get(second))) continue;
+            assignSlot(second, s2, courtMap);
+            scheduled.add(second);
+            return List.of(first, second);
+        }
+        // sin segunda cancha: revertir el primero
+        scheduled.remove(first);
+        first.setScheduledStart(null);
+        first.setScheduledEnd(null);
+        first.setCourt(null);
+        first.setStatus(MatchStatus.PENDING);
+        return null;
+    }
+
+    private void assignSlot(Match match, TimeSlot slot, Map<Long, Court> courtMap) {
+        match.setScheduledStart(LocalDateTime.of(slot.getDate(), slot.getStartTime()));
+        match.setScheduledEnd(LocalDateTime.of(slot.getDate(), slot.getEndTime()));
+        match.setCourt(courtMap.get(slot.getCourtId()));
+        match.setStatus(MatchStatus.SCHEDULED);
+    }
+
+    /** Greedy best-effort (fallback): a cada unidad le asigna el primer slot válido, sin deshacer. */
+    private void greedySchedule(List<List<Match>> units, List<TimeSlot> slots, Map<Long, Court> courtMap,
                                 Tournament tournament, Map<Long, List<PairScheduleConstraint>> constraintsByPairId,
-                                List<Match> scheduled) {
+                                Map<Match, List<Long>> pairsOf, List<Match> scheduled) {
         int satisfiedWithPrefs = 0;
         int relaxedFromPrefs = 0;
         int unscheduled = 0;
 
-        for (Match match : ordered) {
-            TimeSlot chosen = null;
+        for (List<Match> unit : units) {
+            Match rep = unit.get(0);
+            List<Long> repPairs = pairsOf.get(rep);
+            boolean matchHasPrefs = hasAnyPreference(rep, constraintsByPairId, repPairs);
+            List<Match> placed = null;
             boolean fromPreferences = false;
-            Long p1id = match.getPair1().getId();
-            Long p2id = match.getPair2() != null ? match.getPair2().getId() : null;
-            boolean matchHasPrefs = hasAnyPreference(match, constraintsByPairId);
 
             // Pasada 1: intenta respetar preferencias (soft constraints ON)
             for (TimeSlot slot : slots) {
-                if (isValidSlot(match, slot, scheduled, tournament, constraintsByPairId, true)) {
-                    chosen = slot;
-                    fromPreferences = true;
-                    break;
-                }
+                if (!isValidSlot(rep, slot, scheduled, tournament, constraintsByPairId, true, repPairs)) continue;
+                placed = placeUnit(unit, slot, slots, courtMap, tournament, constraintsByPairId, pairsOf, scheduled);
+                if (placed != null) { fromPreferences = true; break; }
             }
 
             // Pasada 2: si no encontró, relaja preferencias (solo hard constraints)
-            if (chosen == null) {
+            if (placed == null) {
                 if (matchHasPrefs) {
-                    log.warn("   ⚠ match pareja {} vs pareja {} no encontró slot en preferencias, relajando...", p1id, p2id);
+                    log.warn("   ⚠ {} no encontró slot en preferencias, relajando...", unitLabel(unit));
                 }
                 for (TimeSlot slot : slots) {
-                    if (isValidSlot(match, slot, scheduled, tournament, constraintsByPairId, false)) {
-                        chosen = slot;
-                        break;
-                    }
+                    if (!isValidSlot(rep, slot, scheduled, tournament, constraintsByPairId, false, repPairs)) continue;
+                    placed = placeUnit(unit, slot, slots, courtMap, tournament, constraintsByPairId, pairsOf, scheduled);
+                    if (placed != null) break;
                 }
             }
 
-            if (chosen != null) {
-                match.setScheduledStart(LocalDateTime.of(chosen.getDate(), chosen.getStartTime()));
-                match.setScheduledEnd(LocalDateTime.of(chosen.getDate(), chosen.getEndTime()));
-                match.setCourt(courtMap.get(chosen.getCourtId()));
-                match.setStatus(MatchStatus.SCHEDULED);
-                scheduled.add(match);
+            if (placed != null) {
                 if (fromPreferences) {
-                    satisfiedWithPrefs++;
-                } else if (hasAnyPreference(match, constraintsByPairId)) {
-                    relaxedFromPrefs++;
-                    log.warn("⚠ Preferencia NO respetada — match pareja {} vs pareja {} → programado {} {} (fuera de las preferencias de las parejas)",
-                            match.getPair1().getId(),
-                            match.getPair2() != null ? match.getPair2().getId() : "BYE",
-                            chosen.getDate(), chosen.getStartTime());
+                    satisfiedWithPrefs += unit.size();
+                } else if (matchHasPrefs) {
+                    relaxedFromPrefs += unit.size();
+                    log.warn("⚠ Preferencia NO respetada — {} → programado {} {} (fuera de las preferencias de las parejas)",
+                            unitLabel(unit), rep.getScheduledStart().toLocalDate(), rep.getScheduledStart().toLocalTime());
                 } else {
-                    satisfiedWithPrefs++; // partido sin preferencias = no se violó nada
+                    satisfiedWithPrefs += unit.size(); // sin preferencias = no se violó nada
                 }
             } else {
-                unscheduled++;
-                log.warn("No se pudo programar el partido entre pareja {} y pareja {}",
-                        match.getPair1().getId(),
-                        match.getPair2() != null ? match.getPair2().getId() : "BYE");
+                unscheduled += unit.size();
+                log.warn("No se pudo programar: {}", unitLabel(unit));
             }
         }
 
@@ -451,38 +570,34 @@ public class FixtureService {
      * debe procesarse primero.
      */
     private int countCompatibleSlots(Match match, List<TimeSlot> allSlots,
-                                      Map<Long, List<PairScheduleConstraint>> constraintsByPairId) {
+                                      Map<Long, List<PairScheduleConstraint>> constraintsByPairId,
+                                      List<Long> pairIds) {
         if (match.getPhase() != MatchPhase.ZONE) return allSlots.size();
-
-        Long pair1Id = match.getPair1().getId();
-        Long pair2Id = match.getPair2() != null ? match.getPair2().getId() : null;
-        List<PairScheduleConstraint> c1 = constraintsByPairId.getOrDefault(pair1Id, List.of());
-        List<PairScheduleConstraint> c2 = pair2Id != null
-                ? constraintsByPairId.getOrDefault(pair2Id, List.of())
-                : List.of();
-
-        boolean p1HasPrefs = hasPreferences(c1);
-        boolean p2HasPrefs = hasPreferences(c2);
 
         int count = 0;
         for (TimeSlot slot : allSlots) {
-            if (violatesRestriction(slot, c1)) continue;
-            if (violatesRestriction(slot, c2)) continue;
-            if (p1HasPrefs && !satisfiesPreference(slot, c1)) continue;
-            if (p2HasPrefs && !satisfiesPreference(slot, c2)) continue;
-            count++;
+            boolean ok = true;
+            for (Long pid : pairIds) {
+                List<PairScheduleConstraint> cs = constraintsByPairId.getOrDefault(pid, List.of());
+                if (violatesRestriction(slot, cs)
+                        || (hasPreferences(cs) && !satisfiesPreference(slot, cs))) {
+                    ok = false;
+                    break;
+                }
+            }
+            if (ok) count++;
         }
         return count;
     }
 
-    /** True si alguna pareja del match tiene al menos una preferencia. */
+    /** True si alguna pareja (efectiva) del match tiene al menos una preferencia. */
     private boolean hasAnyPreference(Match match,
-                                      Map<Long, List<PairScheduleConstraint>> constraintsByPairId) {
+                                      Map<Long, List<PairScheduleConstraint>> constraintsByPairId,
+                                      List<Long> pairIds) {
         if (match.getPhase() != MatchPhase.ZONE) return false;
-        Long pair1Id = match.getPair1().getId();
-        Long pair2Id = match.getPair2() != null ? match.getPair2().getId() : null;
-        if (hasPreferences(constraintsByPairId.getOrDefault(pair1Id, List.of()))) return true;
-        if (pair2Id != null && hasPreferences(constraintsByPairId.getOrDefault(pair2Id, List.of()))) return true;
+        for (Long pid : pairIds) {
+            if (hasPreferences(constraintsByPairId.getOrDefault(pid, List.of()))) return true;
+        }
         return false;
     }
 
@@ -491,43 +606,31 @@ public class FixtureService {
                                   List<Match> scheduled,
                                   Tournament tournament,
                                   Map<Long, List<PairScheduleConstraint>> constraintsByPairId,
-                                  boolean enforcePreferences) {
+                                  boolean enforcePreferences,
+                                  List<Long> pairIds) {
 
-        Long pair1Id = match.getPair1().getId();
-        Long pair2Id = match.getPair2() != null ? match.getPair2().getId() : null;
         int minInterval = tournament.getMinIntervalMinutes();
 
         // 1. Cancha no ocupada en ese slot
         if (isCourtOccupied(slot, scheduled)) return false;
 
-        // 2. Ninguna pareja tiene otro partido en ese slot (concurrencia)
-        if (isPairBusy(pair1Id, slot, scheduled)) return false;
-        if (pair2Id != null && isPairBusy(pair2Id, slot, scheduled)) return false;
-
-        // 3. Intervalo mínimo entre partidos de la misma pareja
-        if (violatesMinInterval(pair1Id, slot, scheduled, minInterval)) return false;
-        if (pair2Id != null && violatesMinInterval(pair2Id, slot, scheduled, minInterval)) return false;
+        // 2 y 3. Por cada pareja efectiva (las 4 de la zona en placeholders de R2):
+        // sin otro partido en ese slot, y respetando el intervalo mínimo inicio-a-inicio.
+        for (Long pid : pairIds) {
+            if (isPairBusy(pid, slot, scheduled)) return false;
+            if (violatesMinInterval(pid, slot, scheduled, minInterval)) return false;
+        }
 
         // 3b. Orden de rondas en zona de 4: la Ronda 2 (gan/per) debe ir DESPUÉS de la
-        // Ronda 1 de sus parejas + el intervalo mínimo (comparando fecha y hora completas).
-        if (violatesZoneRoundOrder(match, slot, scheduled)) return false;
+        // Ronda 1 de sus parejas (comparando fecha y hora completas).
+        if (violatesZoneRoundOrder(match, slot, scheduled, pairIds)) return false;
 
         // 4. Restricciones y preferencias: solo aplican a partidos de zona
         if (match.getPhase() == MatchPhase.ZONE) {
-            List<PairScheduleConstraint> constraints1 = constraintsByPairId.getOrDefault(pair1Id, List.of());
-            List<PairScheduleConstraint> constraints2 = pair2Id != null
-                    ? constraintsByPairId.getOrDefault(pair2Id, List.of())
-                    : List.of();
-
-            if (violatesRestriction(slot, constraints1)) return false;
-            if (violatesRestriction(slot, constraints2)) return false;
-
-            if (enforcePreferences) {
-                boolean pair1HasPrefs = hasPreferences(constraints1);
-                boolean pair2HasPrefs = hasPreferences(constraints2);
-
-                if (pair1HasPrefs && !satisfiesPreference(slot, constraints1)) return false;
-                if (pair2HasPrefs && !satisfiesPreference(slot, constraints2)) return false;
+            for (Long pid : pairIds) {
+                List<PairScheduleConstraint> cs = constraintsByPairId.getOrDefault(pid, List.of());
+                if (violatesRestriction(slot, cs)) return false;
+                if (enforcePreferences && hasPreferences(cs) && !satisfiesPreference(slot, cs)) return false;
             }
         }
 
@@ -574,18 +677,16 @@ public class FixtureService {
      * Ronda 1 de sus parejas (orden correcto, sin solape; vale también entre días). El intervalo
      * mínimo inicio-a-inicio entre partidos de la pareja lo garantiza violatesMinInterval.
      */
-    private boolean violatesZoneRoundOrder(Match match, TimeSlot slot, List<Match> scheduled) {
+    private boolean violatesZoneRoundOrder(Match match, TimeSlot slot, List<Match> scheduled, List<Long> pairIds) {
         Integer round = match.getZoneRound();
         if (match.getPhase() != MatchPhase.ZONE || round == null) return false;
 
-        Long p1 = match.getPair1().getId();
-        Long p2 = match.getPair2() != null ? match.getPair2().getId() : null;
         LocalDateTime slotStart = LocalDateTime.of(slot.getDate(), slot.getStartTime());
 
         return scheduled.stream()
                 .filter(m -> m.getZoneRound() != null && m.getZoneRound() < round) // rondas previas de la zona
                 .filter(m -> m.getScheduledEnd() != null)
-                .filter(m -> involvesPair(m, p1) || (p2 != null && involvesPair(m, p2)))
+                .filter(m -> pairIds.stream().anyMatch(pid -> involvesPair(m, pid)))
                 .anyMatch(m -> slotStart.isBefore(m.getScheduledEnd()));
     }
 
@@ -630,9 +731,10 @@ public class FixtureService {
     private Map<Long, List<PairScheduleConstraint>> buildConstraintsMap(List<Match> matches) {
         Map<Long, List<PairScheduleConstraint>> map = new HashMap<>();
         Set<Long> pairIds = new HashSet<>();
+        Map<Long, List<Long>> zoneCache = new HashMap<>();
         for (Match m : matches) {
-            if (m.getPair1() != null) pairIds.add(m.getPair1().getId());
-            if (m.getPair2() != null) pairIds.add(m.getPair2().getId());
+            // Incluye las parejas efectivas: en placeholders de R2 (sin parejas), las 4 de la zona
+            pairIds.addAll(computeEffectivePairIds(m, zoneCache));
         }
         for (Long pairId : pairIds) {
             map.put(pairId, constraintRepository.findByPairId(pairId));
@@ -933,6 +1035,8 @@ public class FixtureService {
                 .id(match.getId())
                 .zoneName(match.getZone() != null ? "Zona " + match.getZone().getName() : null)
                 .eliminationRound(match.getEliminationRound())
+                .zoneRound(match.getZoneRound())
+                .zoneRound2Type(match.getZoneRound2Type() != null ? match.getZoneRound2Type().name() : null)
                 .pair1(match.getPair1() != null ? toPairDto(match.getPair1()) : null)
                 .pair2(match.getPair2() != null ? toPairDto(match.getPair2()) : null)
                 .courtId(match.getCourt() != null ? match.getCourt().getId() : null)
@@ -1095,20 +1199,20 @@ public class FixtureService {
     /** Motivo por el que un partido NO puede ir a un slot (null = válido). Mismas reglas que isValidSlot (sin preferencias). */
     private String placementReason(Match match, TimeSlot slot, List<Match> scheduled,
                                    Tournament tournament, Map<Long, List<PairScheduleConstraint>> cons) {
-        Long p1 = match.getPair1().getId();
-        Long p2 = match.getPair2() != null ? match.getPair2().getId() : null;
+        // Parejas efectivas: en placeholders de R2 (sin parejas aún), las 4 de la zona
+        List<Long> pairIds = effectivePairIds(match);
         if (isCourtOccupied(slot, scheduled)) return "Cancha ocupada";
-        if (isPairBusy(p1, slot, scheduled) || (p2 != null && isPairBusy(p2, slot, scheduled)))
-            return "Una pareja ya juega a esa hora";
         int minInt = tournament.getMinIntervalMinutes();
-        if (violatesMinInterval(p1, slot, scheduled, minInt) || (p2 != null && violatesMinInterval(p2, slot, scheduled, minInt)))
-            return "No respeta el intervalo mínimo de la pareja";
-        if (violatesZoneRoundOrder(match, slot, scheduled)) return "La Ronda 2 debe ir después de la Ronda 1";
+        for (Long pid : pairIds) {
+            if (isPairBusy(pid, slot, scheduled)) return "Una pareja ya juega a esa hora";
+            if (violatesMinInterval(pid, slot, scheduled, minInt)) return "No respeta el intervalo mínimo de la pareja";
+        }
+        if (violatesZoneRoundOrder(match, slot, scheduled, pairIds)) return "La Ronda 2 debe ir después de la Ronda 1";
         if (match.getPhase() == MatchPhase.ZONE) {
-            List<PairScheduleConstraint> c1 = cons.getOrDefault(p1, List.of());
-            List<PairScheduleConstraint> c2 = p2 != null ? cons.getOrDefault(p2, List.of()) : List.of();
-            if (violatesRestriction(slot, c1) || violatesRestriction(slot, c2))
-                return "Choca con una restricción horaria de la pareja";
+            for (Long pid : pairIds) {
+                if (violatesRestriction(slot, cons.getOrDefault(pid, List.of())))
+                    return "Choca con una restricción horaria de la pareja";
+            }
         }
         return null;
     }

@@ -40,6 +40,12 @@ public class Match {
     @Column(name = "zone_round")
     private Integer zoneRound;
 
+    // Solo para zona de 4 ronda 2: WINNERS (gan vs gan) o LOSERS (perd vs perd).
+    // Las parejas quedan null hasta que se cierra la Ronda 1 de la zona.
+    @Enumerated(EnumType.STRING)
+    @Column(name = "zone_round2_type", length = 10)
+    private com.padeladmin.padeladmin.enums.ZoneRound2Type zoneRound2Type;
+
     // Posición en el cuadro para reconstruir el draw
     @Column(name = "bracket_slot")
     private Integer bracketSlot;

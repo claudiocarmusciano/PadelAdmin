@@ -68,16 +68,25 @@ function nameWithInitial(fullName: string): string {
   return `${last} ${first.charAt(0)}.`
 }
 
-/** Bloque del calendario: "Fernandes A. / Patronelli P." o "BYE". */
-function pairShortLabel(pair?: MatchPair): string {
-  if (!pair) return 'BYE'
+/** Bloque del calendario: "Fernandes A. / Patronelli P." o el fallback ("BYE", "Ganador"...). */
+function pairShortLabel(pair?: MatchPair, fallback = 'BYE'): string {
+  if (!pair) return fallback
   return `${nameWithInitial(pair.player1)} / ${nameWithInitial(pair.player2)}`
 }
 
-/** Modal: nombre completo "Fernandes Ariel / Patronelli Pedro" */
-function pairFullLabel(pair?: MatchPair): string {
-  if (!pair) return 'BYE'
+/** Modal: nombre completo "Fernandes Ariel / Patronelli Pedro" (o el fallback). */
+function pairFullLabel(pair?: MatchPair, fallback = 'BYE'): string {
+  if (!pair) return fallback
   return `${pair.player1} / ${pair.player2}`
+}
+
+/**
+ * Fallback para partidos sin parejas: los placeholders de Ronda 2 de zona de 4 muestran
+ * "Ganador" / "Perdedor" hasta que se cierre la Ronda 1.
+ */
+function sideFallback(match: MatchResponse): string {
+  if (match.zoneRound === 2) return match.zoneRound2Type === 'LOSERS' ? 'Perdedor' : 'Ganador'
+  return 'BYE'
 }
 
 const STATUS_STYLES: Record<string, string> = {
@@ -165,10 +174,10 @@ function MatchBlock({
   const top = rowIndex * ROW_HEIGHT + 4
   const height = ROW_HEIGHT - 8
 
-  const p1Short = pairShortLabel(match.pair1)
-  const p2Short = pairShortLabel(match.pair2)
-  const p1Full = pairFullLabel(match.pair1)
-  const p2Full = pairFullLabel(match.pair2)
+  const p1Short = pairShortLabel(match.pair1, sideFallback(match))
+  const p2Short = pairShortLabel(match.pair2, sideFallback(match))
+  const p1Full = pairFullLabel(match.pair1, sideFallback(match))
+  const p2Full = pairFullLabel(match.pair2, sideFallback(match))
 
   return (
     <button
@@ -203,8 +212,8 @@ function MatchDetailDialog({ match, onClose, onMove, canMove }: {
   canMove: boolean
 }) {
   if (!match) return null
-  const p1Names = pairFullLabel(match.pair1)
-  const p2Names = pairFullLabel(match.pair2)
+  const p1Names = pairFullLabel(match.pair1, sideFallback(match))
+  const p2Names = pairFullLabel(match.pair2, sideFallback(match))
   // Se puede mover si es admin, tiene parejas reales y todavía no se jugó
   const movable = canMove && !!match.pair1 && !!match.pair2 && match.status !== 'PLAYED'
 
@@ -309,7 +318,7 @@ function MoveMatchDialog({ match, tournamentId, onClose }: {
           </DialogTitle>
         </DialogHeader>
         <div className="text-sm space-y-1 mb-1">
-          <div className="font-medium">{pairFullLabel(match.pair1)} <span className="text-muted-foreground">vs</span> {pairFullLabel(match.pair2)}</div>
+          <div className="font-medium">{pairFullLabel(match.pair1, sideFallback(match))} <span className="text-muted-foreground">vs</span> {pairFullLabel(match.pair2, sideFallback(match))}</div>
           <p className="text-xs text-muted-foreground">
             Tocá un horario en <span className="text-emerald-400 font-medium">verde</span> (disponible).
             Los <span className="text-destructive font-medium">rojos</span> no se pueden: chocan con otro partido o violan una restricción/pulmón.
@@ -529,8 +538,8 @@ export default function CalendarTab({ tournamentId }: Props) {
             </h3>
             <div className="space-y-1.5">
               {pendingMatches.map((m) => {
-                const p1 = pairFullLabel(m.pair1)
-                const p2 = pairFullLabel(m.pair2)
+                const p1 = pairFullLabel(m.pair1, sideFallback(m))
+                const p2 = pairFullLabel(m.pair2, sideFallback(m))
                 return (
                   <button
                     key={m.id}
@@ -556,8 +565,8 @@ export default function CalendarTab({ tournamentId }: Props) {
             </h3>
             <div className="space-y-1.5">
               {playedNoSchedule.map((m) => {
-                const p1 = pairFullLabel(m.pair1)
-                const p2 = pairFullLabel(m.pair2)
+                const p1 = pairFullLabel(m.pair1, sideFallback(m))
+                const p2 = pairFullLabel(m.pair2, sideFallback(m))
                 return (
                   <button
                     key={m.id}

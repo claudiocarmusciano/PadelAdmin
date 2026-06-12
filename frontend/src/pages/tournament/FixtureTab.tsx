@@ -75,6 +75,17 @@ interface SetScore {
   pair2Games: number
 }
 
+/**
+ * Nombre a mostrar de cada lado del partido. Para los placeholders de Ronda 2 de zona de 4
+ * (sin parejas hasta que termine la Ronda 1) muestra "Ganador" / "Perdedor".
+ */
+function sideLabel(match: MatchResponse, which: 1 | 2): string {
+  const pair = which === 1 ? match.pair1 : match.pair2
+  if (pair) return `${pair.player1} / ${pair.player2}`
+  if (match.zoneRound === 2) return match.zoneRound2Type === 'LOSERS' ? 'Perdedor' : 'Ganador'
+  return 'TBD'
+}
+
 // ── Dialog de resultado (zona o bracket) ─────────────────────────────────────
 
 export function ResultDialog({
@@ -323,9 +334,9 @@ function CourtDialog({
       </DialogHeader>
       <div className="py-2 space-y-4">
         <p className="text-sm text-muted-foreground">
-          {match.pair1 ? `${match.pair1.player1} / ${match.pair1.player2}` : '–'}
+          {sideLabel(match, 1)}
           <span className="mx-1">vs</span>
-          {match.pair2 ? `${match.pair2.player1} / ${match.pair2.player2}` : '–'}
+          {sideLabel(match, 2)}
         </p>
 
         {/* Selector de cancha */}
@@ -412,6 +423,13 @@ function MatchCard({
               {match.zoneName && (
                 <Badge variant="outline" className="text-xs ml-1">{match.zoneName}</Badge>
               )}
+              {match.zoneRound != null && (
+                <Badge variant="outline" className="text-xs ml-1">
+                  {match.zoneRound === 2
+                    ? (match.zoneRound2Type === 'LOSERS' ? 'R2 · Perdedores' : 'R2 · Ganadores')
+                    : 'R1'}
+                </Badge>
+              )}
               {match.eliminationRound != null && (
                 <Badge variant="outline" className="text-xs ml-1">
                   Ronda {match.eliminationRound}
@@ -423,10 +441,10 @@ function MatchCard({
               <div className="flex items-center gap-3">
                 <div className="flex-1 min-w-0 space-y-0.5">
                   <div className={`text-sm truncate ${pair1Won ? 'font-semibold text-foreground' : 'text-muted-foreground'}`}>
-                    {match.pair1 ? `${match.pair1.player1} / ${match.pair1.player2}` : 'TBD'}
+                    {sideLabel(match, 1)}
                   </div>
                   <div className={`text-sm truncate ${pair2Won ? 'font-semibold text-foreground' : 'text-muted-foreground'}`}>
-                    {match.pair2 ? `${match.pair2.player1} / ${match.pair2.player2}` : 'TBD'}
+                    {sideLabel(match, 2)}
                   </div>
                 </div>
                 <div className="flex gap-2 shrink-0 items-start">
@@ -448,9 +466,9 @@ function MatchCard({
               </div>
             ) : (
               <div className="text-sm font-medium">
-                {match.pair1 ? `${match.pair1.player1} / ${match.pair1.player2}` : 'TBD'}
+                {sideLabel(match, 1)}
                 <span className="text-muted-foreground mx-1">vs</span>
-                {match.pair2 ? `${match.pair2.player1} / ${match.pair2.player2}` : 'TBD'}
+                {sideLabel(match, 2)}
               </div>
             )}
 

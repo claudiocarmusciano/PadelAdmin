@@ -14,6 +14,10 @@ public class MatchResponseDto {
     private Long id;
     private String zoneName;
     private Integer eliminationRound;
+    /** Zona de 4: 1 = primera ronda, 2 = ganadores/perdedores. */
+    private Integer zoneRound;
+    /** Zona de 4 R2: WINNERS o LOSERS. Con pair1/pair2 null = placeholder ("Ganador vs Ganador"). */
+    private String zoneRound2Type;
     private MatchPairDto pair1;
     private MatchPairDto pair2;
     private Long courtId;

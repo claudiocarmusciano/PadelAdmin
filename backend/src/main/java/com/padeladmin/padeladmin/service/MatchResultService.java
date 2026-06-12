@@ -5,6 +5,7 @@ import com.padeladmin.padeladmin.dto.match.*;
 import com.padeladmin.padeladmin.entity.*;
 import com.padeladmin.padeladmin.enums.MatchPhase;
 import com.padeladmin.padeladmin.enums.MatchStatus;
+import com.padeladmin.padeladmin.enums.ZoneRound2Type;
 import com.padeladmin.padeladmin.entity.MatchSet;
 import com.padeladmin.padeladmin.exception.BusinessException;
 import com.padeladmin.padeladmin.exception.ResourceNotFoundException;
@@ -42,6 +43,10 @@ public class MatchResultService {
         }
         if (match.getStatus() == MatchStatus.CANCELLED) {
             throw new BusinessException("No se puede cargar resultado de un partido cancelado");
+        }
+        if (match.getPair1() == null) {
+            throw new BusinessException(
+                    "El partido aún no tiene parejas definidas: faltan los resultados de la Ronda 1 de la zona");
         }
         if (match.getPair2() == null || match.isBye()) {
             throw new BusinessException("No se puede cargar resultado de un partido con BYE");
@@ -463,8 +468,6 @@ public class MatchResultService {
                 && round1Matches.stream().allMatch(m -> m.getStatus() == MatchStatus.PLAYED);
         if (!allPlayed) return false;
 
-        if (!matchRepository.findByZoneIdAndZoneRound(zone.getId(), 2).isEmpty()) return false;
-
         Match m1 = round1Matches.get(0);
         Match m2 = round1Matches.get(1);
 
@@ -476,13 +479,44 @@ public class MatchResultService {
         Pair winner2 = r2.getWinnerPair();
         Pair loser2 = winner2.getId().equals(m2.getPair1().getId()) ? m2.getPair2() : m2.getPair1();
 
+        List<Match> round2 = matchRepository.findByZoneIdAndZoneRound(zone.getId(), 2);
+
+        if (!round2.isEmpty()) {
+            // Placeholders creados al generar el fixture (ya tienen cancha y horario, ambos en
+            // el mismo horario): rellenar las parejas. Si se corrige un resultado de R1, se
+            // re-rellenan — salvo que la R2 ya se haya jugado.
+            boolean changed = false;
+            for (Match m : round2) {
+                if (m.getStatus() == MatchStatus.PLAYED) continue;
+                boolean losersMatch = m.getZoneRound2Type() == ZoneRound2Type.LOSERS;
+                Pair a = losersMatch ? loser1 : winner1;
+                Pair b = losersMatch ? loser2 : winner2;
+                Long curA = m.getPair1() != null ? m.getPair1().getId() : null;
+                Long curB = m.getPair2() != null ? m.getPair2().getId() : null;
+                if (!a.getId().equals(curA) || !b.getId().equals(curB)) {
+                    m.setPair1(a);
+                    m.setPair2(b);
+                    changed = true;
+                }
+            }
+            if (changed) {
+                matchRepository.saveAll(round2);
+                log.info("Ronda 2 completada — Zona {}: Ganadores {} vs {} | Perdedores {} vs {}",
+                        zone.getName(), winner1.getId(), winner2.getId(), loser1.getId(), loser2.getId());
+            }
+            return changed;
+        }
+
+        // Fallback (torneos con fixture generado antes de los placeholders): crear los partidos
         Match winnersMatch = Match.builder()
                 .tournament(tournament).phase(MatchPhase.ZONE).zone(zone)
-                .pair1(winner1).pair2(winner2).zoneRound(2).status(MatchStatus.PENDING).build();
+                .pair1(winner1).pair2(winner2).zoneRound(2)
+                .zoneRound2Type(ZoneRound2Type.WINNERS).status(MatchStatus.PENDING).build();
 
         Match losersMatch = Match.builder()
                 .tournament(tournament).phase(MatchPhase.ZONE).zone(zone)
-                .pair1(loser1).pair2(loser2).zoneRound(2).status(MatchStatus.PENDING).build();
+                .pair1(loser1).pair2(loser2).zoneRound(2)
+                .zoneRound2Type(ZoneRound2Type.LOSERS).status(MatchStatus.PENDING).build();
 
         matchRepository.saveAll(List.of(winnersMatch, losersMatch));
 

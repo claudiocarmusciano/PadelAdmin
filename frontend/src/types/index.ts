@@ -247,6 +247,10 @@ export interface MatchResponse {
   id: number
   zoneName?: string
   eliminationRound?: number
+  /** Zona de 4: 1 = primera ronda, 2 = ganadores/perdedores. */
+  zoneRound?: number
+  /** Zona de 4 R2: 'WINNERS' | 'LOSERS'. Con pair1/pair2 null = placeholder ("Ganador vs Ganador"). */
+  zoneRound2Type?: 'WINNERS' | 'LOSERS' | null
   pair1?: MatchPair
   pair2?: MatchPair
   courtId?: number
